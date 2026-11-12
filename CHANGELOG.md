@@ -6,8 +6,11 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-12
+
 ### Changed
 - The secret-word box (five taps on the greeting) is one joined pill: the text field with the OK button as its end, and no extra highlight ring.
+- Every release now has readable notes, collected in `CHANGELOG.md` (also included in the downloads).
 
 ## [1.3.0] - 2026-11-12
 
@@ -63,7 +66,8 @@ First public release.
 - **Docker image** on ghcr.io (amd64 and arm64), with Compose and Dockge support.
 - Copes with unreliable services: timeouts, retries, cached data marked **Offline** or **Partial**, and "—" instead of a misleading 0.
 
-[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/puppygirlzone/pupboardboard/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.0.0...v1.1.0
