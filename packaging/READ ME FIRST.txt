@@ -48,9 +48,18 @@ networks only.)
 
 UPDATING
 
-Download the new zip, unzip it, and copy the "data" and "config" folders
-from your old pupboard folder into the new one. They hold your settings,
-feeds and gaming history.
+Your settings, feeds and gaming history live in the "data" and "config"
+folders. A new version never replaces them, so updating keeps everything.
+
+  1. Close the black pupboard window.
+  2. Windows: right-click the new zip, choose "Extract All...", pick the
+     folder that contains your current "pupboard" folder (not the pupboard
+     folder itself), and choose "Replace the files in the destination".
+     Linux: unzip -o the new zip in the same place as before.
+     macOS: unzipping makes a new "pupboard 2" folder instead. Copy the
+     "data" and "config" folders from your old pupboard folder into it,
+     then use the new one.
+  3. Start pupboard again.
 
 
 STOPPING / REMOVING

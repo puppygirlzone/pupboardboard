@@ -6,6 +6,11 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-13
+
+### Changed
+- Easier updates for the downloads: every zip now unzips to a folder called just `pupboard`. On Windows, extract a new version over the old one and choose to replace the files; your settings, feeds and gaming history are kept.
+
 ## [1.4.0] - 2026-11-12
 
 Thanks to Bird for testing pupboard and suggesting everything in this release: launching games from Steam, keeping background apps out of your hours, smoother text, and the Settings page fixes.
@@ -79,7 +84,8 @@ First public release.
 - **Docker image** on ghcr.io (amd64 and arm64), with Compose and Dockge support.
 - Copes with unreliable services: timeouts, retries, cached data marked **Offline** or **Partial**, and "—" instead of a misleading 0.
 
-[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/puppygirlzone/pupboardboard/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.2.0...v1.3.0
