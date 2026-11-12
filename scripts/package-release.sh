@@ -34,8 +34,9 @@ mkdir -p "$stage/runtime" "$stage/config" "$stage/data"
 
 # --- the app
 cp -R "$root/server" "$root/public" "$stage/"
-cp "$root/package.json" "$root/package-lock.json" "$root/LICENSE" "$root/README.md" "$root/CHANGELOG.md" "$root/.env.example" "$stage/"
+cp "$root/package.json" "$root/package-lock.json" "$root/LICENSE" "$root/README.md" "$root/SECURITY.md" "$root/CHANGELOG.md" "$root/.env.example" "$stage/"
 cp "$root/config/feeds.example.txt" "$stage/config/"
+mkdir -p "$stage/docs" && cp "$root"/docs/*.md "$stage/docs/"   # README links to these
 (cd "$stage" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund --loglevel=error)
 
 # --- launchers (Windows files get CRLF line endings)

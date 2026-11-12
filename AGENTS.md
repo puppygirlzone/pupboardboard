@@ -91,6 +91,11 @@ The overview page is the at-a-glance view. Each source has a detail page with mo
 - Views in `public/js/views.js` are **pure functions** (data in, HTML string out, no DOM) so they're testable in Node. Keep it that way.
 - **Demo data is invented.** `server/demo/fake-upstreams.js` uses made-up games, artists, films, shows and feed stories, fake Steam app ids, and generated placeholder art (`/api/demo-art/...`, demo mode only). Don't add real titles, artwork or app ids: screenshots of demo mode end up in the README.
 
+## Docs
+
+- **The README is for humans getting started**: what pupboard is, its features, how to install it, a short "Connecting your stuff" table, then contributing and licence at the bottom. Keep it short and in the casual first-person voice.
+- Details go in their own files: settings, themes, feeds and Spotify direct in `docs/Customise.md`; reliability and accuracy notes in `docs/Services.md`; security in `SECURITY.md`. `scripts/package-release.sh` ships these in the zips so the README's links work.
+
 ## Project map
 
 ```
@@ -115,7 +120,7 @@ tests/                     node:test suites (npm test)
 ## Adding a new data source
 
 1. Write `server/sources/<name>.js` with pure normalisers plus a loader that uses `settleAll(tasks, memory)`.
-2. Add config and an `isConfigured` check in `config.js`, fields in `SETTINGS_FIELDS` (`server/settings.js`) and a section in `public/js/setup.js`, and document the settings in `.env.example` and the README.
+2. Add config and an `isConfigured` check in `config.js`, fields in `SETTINGS_FIELDS` (`server/settings.js`) and a section in `public/js/setup.js`, and document the settings in `.env.example` and `docs/Customise.md` (the README only gets a row in "Connecting your stuff").
 3. Register it in `server/app.js` (`sources`), and add invented fake responses to `server/demo/fake-upstreams.js`.
 4. Add glance and detail renderers in `views.js` and a `SOURCES` entry. For a new card, add a route, a nav link and an accent token in every theme block; for a source that fills an existing slot, add it to `MUSIC_SOURCES`/`MEDIA_SOURCES`, the `GLANCE`/`DETAIL` maps and `slotsOf`, and reuse the slot's accent.
 5. Add tests: parsing (including junk and partial data), the loader with partial failures, rendering in every state, escaping, and settings validation.
