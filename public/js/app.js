@@ -5,10 +5,10 @@ import { greeting, timeAgo, formatClock, formatLongDate } from './format.js';
 import { preload, enter, refresh, pulse, leave, moveNavIndicator, initHoverEffects } from './motion.js';
 import { initThemeControls } from './theme-controls.js';
 import { initMenu } from './menu.js';
-import { initPuppyMode, isPuppy } from './puppy-mode.js';
+import { initPuppyMode, activeEgg } from './puppy-mode.js';
 import { startBackdrop } from './backdrop.js';
 import { mergeNowPlaying, fetchNowPlaying } from './live.js';
-import { puppyGreeting, syncVerb } from './puppy.js';
+import { EGGS, eggGreeting, eggVerb } from './eggs.js';
 
 const REFRESH_MS = 60_000;
 const LOADING_RETRY_MS = 4_000;
@@ -149,7 +149,7 @@ function updateSync(tick = false) {
     syncText.textContent = lastSuccess ? `Server offline · last update ${timeAgo(new Date(lastSuccess).toISOString())}` : 'Server offline · retrying';
   } else {
     syncDot.className = 'sync-dot';
-    syncText.textContent = `${syncVerb(isPuppy())} ${timeAgo(new Date(lastSuccess).toISOString())}`;
+    syncText.textContent = `${eggVerb(activeEgg())} ${timeAgo(new Date(lastSuccess).toISOString())}`;
     if (tick) pulse(syncDot);
   }
 }
@@ -159,8 +159,9 @@ function updateSync(tick = false) {
 function tickClock() {
   const now = new Date();
   $('#clock').textContent = formatClock(now, display);
-  $('#date').textContent = formatLongDate(now, display);
-  $('#greeting').textContent = isPuppy() ? puppyGreeting(now, display.timeZone) : greeting(now, display.timeZone);
+  const egg = activeEgg();
+  $('#date').textContent = formatLongDate(now, { ...display, locale: EGGS[egg]?.lang === 'ja' ? 'ja-JP' : undefined });
+  $('#greeting').textContent = eggGreeting(egg, now, display.timeZone) ?? greeting(now, display.timeZone);
 }
 
 /* ------------------------------------------------------------ boot */
@@ -212,6 +213,7 @@ async function boot() {
       onChange: () => {
         tickClock();
         if (lastSuccess) updateSync();
+        if (summary) render(false); // wording on the cards follows the mode (Aiko: Japanese)
       },
     });
   } catch (err) {

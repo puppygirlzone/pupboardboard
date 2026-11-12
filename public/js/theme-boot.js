@@ -4,10 +4,12 @@
   var theme = 'default';
   var mode = null;
   var puppy = null;
+  var egg = null;
   try {
     theme = localStorage.getItem('pupboard:theme') || theme;
     mode = localStorage.getItem('pupboard:mode');
     puppy = localStorage.getItem('pupboard:puppy');
+    egg = localStorage.getItem('pupboard:egg');
   } catch (e) {
     /* storage blocked: use defaults */
   }
@@ -16,5 +18,11 @@
   }
   document.documentElement.setAttribute('data-theme', theme);
   document.documentElement.setAttribute('data-mode', mode);
-  if (puppy === 'on') document.documentElement.setAttribute('data-puppy', 'on');
+  if (!egg && puppy === 'on') egg = 'puppy';
+  if (egg === 'puppy') document.documentElement.setAttribute('data-puppy', 'on');
+  // Other easter eggs (see js/eggs.js); unknown values are ignored.
+  if (/^(puppy|aiko|cheese|luna|bird)$/.test(egg || '')) {
+    document.documentElement.setAttribute('data-egg', egg);
+    if (egg === 'aiko') document.documentElement.setAttribute('lang', 'ja');
+  }
 })();

@@ -49,7 +49,7 @@
 
 * { box-sizing: border-box; }
 /* Monoid is a wide font, so everything is set a touch smaller to fit. */
-html { background: var(--bg); font-size: 88%; }
+html { background-color: var(--bg); background-image: var(--bg-image, none); background-attachment: fixed; font-size: 88%; }
 body {
   margin: 0;
   min-height: 100vh;
@@ -74,7 +74,7 @@ code { font-family: var(--mono); font-size: 0.9em; background: var(--track); pad
 /* ---------- puppy mode ---------- */
 /* Paw prints drifting behind everything (added by puppy-mode.js). */
 .paws { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; display: none; }
-:root[data-puppy="on"] .paws { display: block; }
+:root[data-puppy="on"] .paws, :root[data-egg] .paws { display: block; }
 .paws svg { position: absolute; width: 38px; height: 38px; fill: var(--music); opacity: 0.16; animation: paw-drift 26s ease-in-out infinite alternate; }
 @keyframes paw-drift { to { transform: translate(30px, -40px) rotate(18deg); } }
 
@@ -457,3 +457,19 @@ p.setup-error { color: var(--err-ink); margin: 4px 0 0; }
 .tile-poster { aspect-ratio: 2 / 3; }
 .row-title a:hover, .tile a:hover { text-decoration: underline; }
 s { text-decoration-thickness: 1px; }
+
+/* ---------------------------------------------------------------- Easter eggs */
+/* Floaters and bursts share the paw styles; these are the per-icon touches. */
+.paws .floater-flag { opacity: 0.4; width: 46px; }
+.visor-glass { fill: var(--bg); }
+.visor-led { fill: var(--steam); }
+:root[data-egg="aiko"] { --font: 'Aiko JP', 'Monoid Web', ui-sans-serif, sans-serif; }
+/* The secret-word box that 5 taps on the greeting open (for phones). */
+.egg-prompt { display: flex; gap: 6px; margin-top: 8px; animation: egg-prompt-in 0.25s ease-out; }
+.egg-prompt input {
+  font: inherit; font-size: 0.9rem; width: 11em; padding: 6px 10px; color: var(--text);
+  background: var(--tint); border: 1px solid var(--border-strong); border-radius: 999px;
+}
+.egg-prompt input:focus-visible, .egg-prompt button:focus-visible { outline: 2px solid var(--music-ink); outline-offset: 2px; }
+.egg-prompt button { font: inherit; font-size: 0.85rem; padding: 6px 12px; cursor: pointer; color: var(--bg); background: var(--music-ink); border: 0; border-radius: 999px; }
+@keyframes egg-prompt-in { from { opacity: 0; } to { opacity: 1; } }

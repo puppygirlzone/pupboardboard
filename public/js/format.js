@@ -75,8 +75,8 @@ export function formatClock(date = new Date(), { timeZone = null, hour12 = false
 }
 
 /** "Thursday 12 November" style, in the browser's language. */
-export function formatLongDate(date = new Date(), { timeZone = null } = {}) {
-  return new Intl.DateTimeFormat(undefined, { timeZone: timeZone ?? undefined, weekday: 'long', month: 'long', day: 'numeric' }).format(date);
+export function formatLongDate(date = new Date(), { timeZone = null, locale = undefined } = {}) {
+  return new Intl.DateTimeFormat(locale, { timeZone: timeZone ?? undefined, weekday: 'long', month: 'long', day: 'numeric' }).format(date);
 }
 
 export function greeting(date = new Date(), timeZone = null) {

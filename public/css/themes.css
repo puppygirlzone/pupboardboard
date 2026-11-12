@@ -99,3 +99,57 @@
   --steam: #2f7fbf; --music: #d63f8c; --media: #8a55d6; --news: #c2621b;
   --ok: #23885f; --warn: #9a6a00; --err: #c8344f;
 }
+
+/* ---------- Other easter eggs (type the word; see js/eggs.js) ----------
+ * Same trick as puppy mode: four attribute selectors beat a theme's three. */
+
+/* Aiko ("aiko"): purple gradients, after a swirly violet wallpaper she likes.
+ * The waves are layered radial gradients behind the see-through cards. */
+:root[data-egg="aiko"][data-theme][data-mode="dark"] {
+  --bg: #1c0b33; --surface: #2a1250; --text: #f6edff; --muted: #c7aee8;
+  --steam: #93b6ff; --music: #e08cff; --media: #b98cff; --news: #ff9ed8;
+  --ok: #7ee8b8; --warn: #ffd27a; --err: #ff7c9c;
+  --bg-image: radial-gradient(70% 60% at 85% 80%, #a855f770 0%, transparent 70%), radial-gradient(55% 50% at 32% 38%, #7c3aed60 0%, transparent 72%), radial-gradient(80% 70% at 60% 55%, #5b21b650 0%, transparent 76%), linear-gradient(135deg, #140626 0%, #2a0f52 45%, #3d1673 100%);
+}
+:root[data-egg="aiko"][data-theme][data-mode="light"] {
+  --bg: #f3e8ff; --surface: #fdf8ff; --text: #2a1145; --muted: #5d4583;
+  --steam: #3d63c9; --music: #a21caf; --media: #7c3aed; --news: #be185d;
+  --ok: #15803d; --warn: #a16207; --err: #be123c;
+  --bg-image: radial-gradient(70% 60% at 85% 80%, #c084fc66 0%, transparent 70%), radial-gradient(55% 50% at 30% 35%, #d8b4fe80 0%, transparent 72%), linear-gradient(135deg, #faf5ff 0%, #efe2ff 50%, #e4cffd 100%);
+}
+
+/* Cheese ("cheese"): cheddar, brie rind and a warm crust. */
+:root[data-egg="cheese"][data-theme][data-mode="dark"] {
+  --bg: #1f1808; --surface: #2c2310; --text: #fff7dc; --muted: #d6c38f;
+  --steam: #ffd24d; --music: #ffb347; --media: #ffe08a; --news: #f0a848;
+  --ok: #a8e07a; --warn: #ffd24d; --err: #ff8a65;
+}
+:root[data-egg="cheese"][data-theme][data-mode="light"] {
+  --bg: #fff6d8; --surface: #fffdf3; --text: #3a2a05; --muted: #6a5622;
+  --steam: #9a6b00; --music: #b45309; --media: #8a6d00; --news: #a14d00;
+  --ok: #3f7d18; --warn: #8a5a00; --err: #b4321e;
+}
+
+/* Luna ("luna"): moonlight, silver and pale gold, after Columbina's colours. */
+:root[data-egg="luna"][data-theme][data-mode="dark"] {
+  --bg: #0b0e1c; --surface: #151a2e; --text: #eef1ff; --muted: #a9b2d6;
+  --steam: #9ec5ff; --music: #d9c6ff; --media: #b8c4ff; --news: #f3dfa2;
+  --ok: #9be7c4; --warn: #f3dfa2; --err: #ff9aa8;
+}
+:root[data-egg="luna"][data-theme][data-mode="light"] {
+  --bg: #eef0f8; --surface: #fbfcff; --text: #161a33; --muted: #4c5478;
+  --steam: #3559b8; --music: #6a4bb5; --media: #4f5fb0; --news: #8a6a12;
+  --ok: #1f7a54; --warn: #8a6a12; --err: #b3354a;
+}
+
+/* Bird / Clanker ("bird" or "clanker"): protogen LED visor, neon on dark. */
+:root[data-egg="bird"][data-theme][data-mode="dark"] {
+  --bg: #061317; --surface: #0c2229; --text: #e4fbff; --muted: #93bcc6;
+  --steam: #38e1ff; --music: #ff7ad9; --media: #a78bfa; --news: #7cf5b4;
+  --ok: #7cf5b4; --warn: #ffd166; --err: #ff6b8b;
+}
+:root[data-egg="bird"][data-theme][data-mode="light"] {
+  --bg: #e6f8fb; --surface: #f8feff; --text: #08262d; --muted: #3f636b;
+  --steam: #00809a; --music: #b5307f; --media: #6a4fd0; --news: #157a52;
+  --ok: #157a52; --warn: #8a6200; --err: #c0304f;
+}
