@@ -1,8 +1,10 @@
 <p align="center">
-  <img src="docs/banner.png" alt="pupboard: a blurred screenshot of the dashboard with the name pupboard written over it" width="100%">
+  <img src="docs/banner.png" alt="pupboardboard: a blurred screenshot of the dashboard with the name pupboardboard written over it, because pupboard was already taken" width="100%">
 </p>
 
-# pupboard
+# pupboardboard
+
+*Because pupboard was already taken.* (The app still calls itself pupboard; the repo got the extra board.)
 
 A colourful, animated homepage that shows your week at a glance:
 
@@ -86,7 +88,7 @@ npm install
 npm run demo
 ```
 
-Demo mode shows made-up data and deliberately fails about 25% of requests, so you can see how the dashboard copes.
+Demo mode shows made-up data and deliberately fails about 25% of requests, so you can see how the dashboard copes. To see the other cards, pick them: `MUSIC_SOURCE=spotify MEDIA_SOURCE=deals npm run demo` (or `listenbrainz` / `letterboxd`).
 
 ## Connecting your stuff
 
@@ -170,6 +172,10 @@ A few secondary-text greys are slightly adjusted from the originals so small tex
 
 - **Steam** only reports "last 2 weeks" playtime. pupboard saves your total playtime once an hour and compares against a week ago. Until 7 days of history exist, it shows the 2-week figures and says so.
 - **Navidrome** only stores the most recent play of each song, so "tracks this week" and "listening time" are minimums: a song played 5 times counts once.
+- **Spotify** only shares your last 50 plays. If all 50 are from this week, the card shows **50+** rather than a made-up total.
+- **ListenBrainz** counts every play, repeats included. If most plays have no track length, listening time shows "—" instead of a number that's too low. "Now playing" depends on your music app reporting it, so it can lag a little.
+- **Letterboxd**'s feed holds about your last 50 diary entries, so a very busy month shows as "50+".
+- **Game deals** prices are in US dollars (CheapShark). If one of the deal sites is down, its number shows "—", not 0.
 
 ## All settings
 
@@ -180,6 +186,8 @@ Everything can go in `.env` (see [`.env.example`](.env.example) for the full lis
 | `PORT` | `8742` | Web port |
 | `HOST` | `0.0.0.0` (`127.0.0.1` for the download) | Which network address to listen on |
 | `TIME_ZONE`, `CLOCK_FORMAT` | browser's zone, `24h` | Clock |
+| `MUSIC_SOURCE`, `MEDIA_SOURCE` | `auto` | Which service fills the Music / Media card |
+| `DEALS` | `on` | `off` hides game deals |
 | `SETUP_PAGE` | `1` | `0` turns the Settings page off |
 | `DATA_DIR` | `./data` | Where settings and Steam history are stored |
 | `DEMO_MODE` | `0` | `1` = made-up data |
@@ -198,7 +206,7 @@ npm test          # Node's built-in test runner, nothing extra to install
 npm run demo      # check your change in the browser with flaky fake data
 ```
 
-The tests cover the retry/cache/back-off logic, each source's parsing (including junk and partial responses), the RSS/Atom parser, the HTTP server under heavy upstream failure, path-traversal and image-proxy safety, the Settings page's access rules, every page in every state, HTML escaping, theme contrast, and the deployment files. Run `npm test` before and after any change.
+The tests cover the retry/cache/back-off logic, every source's parsing (Steam, Navidrome, Jellyfin, Spotify, ListenBrainz, Letterboxd, deals, RSS/Atom, including junk and partial responses), the Spotify sign-in and token refresh, the HTTP server under heavy upstream failure, path-traversal and image-proxy safety, the Settings page's access rules, every page and card choice in every state, HTML escaping, theme contrast, and the deployment files. Run `npm test` before and after any change.
 
 ### Project layout
 
@@ -221,4 +229,6 @@ pupboard is free software under the [GNU GPL v3 or later](LICENSE).
 
 It bundles [Monoid](https://github.com/larsenwork/monoid) (MIT / SIL OFL, see `public/fonts/monoid/LICENSE.txt`) and [anime.js](https://animejs.com/) (MIT). The download zips include [Node.js](https://nodejs.org) (MIT, see `runtime/LICENSE-node.txt`).
 
-Not affiliated with Valve, Navidrome or Jellyfin.
+Game deals data comes from [GamerPower](https://www.gamerpower.com) and [CheapShark](https://www.cheapshark.com); cover art for ListenBrainz plays from the [Cover Art Archive](https://coverartarchive.org).
+
+Not affiliated with Valve, Spotify, ListenBrainz, Letterboxd, Navidrome, Jellyfin, GamerPower or CheapShark.
