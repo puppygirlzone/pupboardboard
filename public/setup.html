@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="referrer" content="no-referrer" />
+    <title>pupboard settings</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script src="/js/theme-boot.js"></script>
+    <link rel="stylesheet" href="/css/fonts.css" />
+    <link rel="stylesheet" href="/css/themes.css" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <script type="module" src="/js/setup.js"></script>
+  </head>
+  <body>
+    <main class="view setup">
+      <header class="page-head">
+        <h1>Settings</h1>
+        <a class="back" href="/">← Dashboard</a>
+      </header>
+      <p class="muted setup-intro">Connect the services you use. Anything you leave empty just shows “Not set up” on the dashboard. Passwords and keys are saved on this computer only and are never shown again.</p>
+      <div id="setup-status" class="panel setup-status" role="status" aria-live="polite">Loading…</div>
+      <form id="setup-form" class="setup-form" hidden novalidate></form>
+    </main>
+    <noscript><p class="empty">The settings page needs JavaScript enabled.</p></noscript>
+  </body>
+</html>

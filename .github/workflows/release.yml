@@ -1,0 +1,34 @@
+# On a version tag (git tag v1.2.3 && git push --tags), builds the
+# double-click zips (app + Node.js runtime + launchers) for Windows, macOS
+# and Linux, and attaches them to a GitHub Release.
+name: Release downloads
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci && npm test
+      - name: Build zips
+        env:
+          VERSION: ${{ github.ref_name }}
+          NODE_MAJOR: '22'
+        run: |
+          for target in win-x64 win-arm64 darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
+            scripts/package-release.sh "${target%-*}" "${target#*-}"
+          done
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" build/*.zip --title "pupboard $GITHUB_REF_NAME" --generate-notes

@@ -1,0 +1,101 @@
+/* Colour themes. Each theme sets the same 11 tokens for night (dark) and
+ * day (light); styles.css derives everything else (cards, borders, tracks)
+ * from these. To add a theme: add both blocks here and an entry in
+ * public/js/themes.js. tests/themes.test.js checks they match and that text
+ * stays readable.
+ *
+ * Tokens: --bg page, --surface cards, --text, --muted, --steam/--music/--media/--news
+ * card accents, --ok/--warn/--err status colours.
+ */
+
+/* ---------- Default (also the fallback for unknown themes) ---------- */
+:root {
+  --bg: #0b0f17; --surface: #161c29; --text: #e6edf6; --muted: #8b98ab;
+  --steam: #5ecbf5; --music: #f472b6; --media: #a78bfa; --news: #fb923c;
+  --ok: #4ade80; --warn: #fbbf24; --err: #f87171;
+}
+:root[data-mode="light"] {
+  --bg: #eef1f6; --surface: #ffffff; --text: #1b2230; --muted: #5b6678;
+  --steam: #0e7fb8; --music: #c0267d; --media: #6d4ed8; --news: #c2410c;
+  --ok: #15803d; --warn: #b45309; --err: #c62828;
+}
+
+/* ---------- Whale (github.com/anufrievroman/whale) ----------
+ * Whale defines Back, Dark1/2, Front, Grey, Blue, Pink, Green only.
+ * warn/err and the whole day variant are derived in the same style, and
+ * Grey (#6a6f87) is lightened for readable small text. */
+:root[data-theme="whale"][data-mode="dark"] {
+  --bg: #1a1e2a; --surface: #212739; --text: #ffffff; --muted: #8a8fa8;
+  --steam: #5eadfc; --music: #fa5ead; --media: #00fbad; --news: #fcd25e;
+  --ok: #00fbad; --warn: #fcd25e; --err: #fc6a5e;
+}
+:root[data-theme="whale"][data-mode="light"] {
+  --bg: #e9edf5; --surface: #f8f9fc; --text: #1a1e2a; --muted: #555b73;
+  --steam: #1f7fd8; --music: #d42a83; --media: #00936a; --news: #a86b00;
+  --ok: #00936a; --warn: #a86b00; --err: #c8372d;
+}
+
+/* ---------- Dracula / Alucard (draculatheme.com/spec) ----------
+ * Night --muted is lightened from Comment (#6272a4), which is too faint for
+ * small text. Day uses Alucard as-is. */
+:root[data-theme="dracula"][data-mode="dark"] {
+  --bg: #21222c; --surface: #282a36; --text: #f8f8f2; --muted: #8c97c0;
+  --steam: #8be9fd; --music: #ff79c6; --media: #bd93f9; --news: #ffb86c;
+  --ok: #50fa7b; --warn: #ffb86c; --err: #ff5555;
+}
+:root[data-theme="dracula"][data-mode="light"] {
+  --bg: #eceade; --surface: #fffbeb; --text: #1f1f1f; --muted: #6c664b;
+  --steam: #036a96; --music: #a3144d; --media: #644ac9; --news: #a34d14;
+  --ok: #14710a; --warn: #a34d14; --err: #cb3a2a;
+}
+
+/* ---------- Catppuccin: Mocha (night) / Latte (day) ---------- */
+:root[data-theme="catppuccin"][data-mode="dark"] {
+  --bg: #181825; --surface: #1e1e2e; --text: #cdd6f4; --muted: #a6adc8;
+  --steam: #89dceb; --music: #f5c2e7; --media: #cba6f7; --news: #fab387;
+  --ok: #a6e3a1; --warn: #fab387; --err: #f38ba8;
+}
+:root[data-theme="catppuccin"][data-mode="light"] {
+  --bg: #e6e9ef; --surface: #eff1f5; --text: #4c4f69; --muted: #5c5f77; /* subtext1 */
+  --steam: #209fb5; --music: #ea76cb; --media: #8839ef; --news: #fe640b;
+  --ok: #40a02b; --warn: #fe640b; --err: #d20f39;
+}
+
+/* ---------- Camellia Hope Dark / Hope Light (github.com/camellia-theme) ----------
+ * Hope Light has no mid grey for secondary text; --muted there is derived. */
+:root[data-theme="camellia"][data-mode="dark"] {
+  --bg: #17181c; --surface: #1e1f24; --text: #e4e5e7; --muted: #8f9093;
+  --steam: #53ade1; --music: #fa3867; --media: #ad60ff; --news: #f3872f;
+  --ok: #3fd43b; --warn: #febd16; --err: #fc3f2c;
+}
+:root[data-theme="camellia"][data-mode="light"] {
+  --bg: #e4e5e7; --surface: #f0f1f2; --text: #17181c; --muted: #55565b;
+  --steam: #53ade1; --music: #fa3867; --media: #ad60ff; --news: #f3872f;
+  --ok: #3fd43b; --warn: #f3872f; /* Orange: Gold is unreadable on light */ --err: #fc3f2c;
+}
+
+/* ---------- Rosé Pine: Main (night) / Dawn (day) ---------- */
+:root[data-theme="rose-pine"][data-mode="dark"] {
+  --bg: #191724; --surface: #1f1d2e; --text: #e0def4; --muted: #908caa;
+  --steam: #9ccfd8; --music: #eb6f92; --media: #c4a7e7; --news: #f6c177;
+  --ok: #9ccfd8; --warn: #f6c177; --err: #eb6f92;
+}
+:root[data-theme="rose-pine"][data-mode="light"] {
+  --bg: #f2e9e1; --surface: #fffaf3; --text: #575279; --muted: #686480; /* darker than subtle for readability */
+  --steam: #56949f; --music: #b4637a; --media: #907aa9; --news: #ea9d34;
+  --ok: #56949f; --warn: #ea9d34; --err: #b4637a;
+}
+
+/* ---------- Puppy mode (easter egg: type "woof") ----------
+ * Overrides whichever theme is picked. One extra attribute in the selector
+ * makes it win over the theme blocks above. Pastel pink, lilac, baby blue. */
+:root[data-puppy="on"][data-theme][data-mode="dark"] {
+  --bg: #1b1220; --surface: #251a2c; --text: #fcf0f7; --muted: #c9adc3;
+  --steam: #8fd3ff; --music: #ff8cc6; --media: #c9a2ff; --news: #ffc38f;
+  --ok: #8ff0c4; --warn: #ffd36e; --err: #ff7a93;
+}
+:root[data-puppy="on"][data-theme][data-mode="light"] {
+  --bg: #fbe9f2; --surface: #fff7fb; --text: #3b1f33; --muted: #74516b;
+  --steam: #2f7fbf; --music: #d63f8c; --media: #8a55d6; --news: #c2621b;
+  --ok: #23885f; --warn: #9a6a00; --err: #c8344f;
+}

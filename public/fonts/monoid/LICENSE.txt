@@ -1,0 +1,4 @@
+Monoid by Andreas Larsen and contributors.
+https://github.com/larsenwork/monoid
+Licensed under the MIT license and the SIL Open Font License 1.1 (see the repository for full texts).
+Files: Monoid-Retina.ttf, Monoid-Regular.ttf from the official release (Monoid.zip).

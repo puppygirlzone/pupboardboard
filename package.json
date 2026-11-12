@@ -1,0 +1,20 @@
+{
+  "name": "pupboard",
+  "version": "1.0.0",
+  "description": "Animated, glanceable stats homepage for your self-hosted services: Steam, Navidrome, Jellyfin and RSS",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "demo": "DEMO_MODE=1 node server/index.js",
+    "test": "node --test \"tests/**/*.test.js\""
+  },
+  "dependencies": {
+    "animejs": "^4.5.0"
+  },
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "GPL-3.0-or-later"
+}

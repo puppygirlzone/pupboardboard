@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pupboard-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "server/index.js"
+      ],
+      "env": {
+        "DEMO_MODE": "1",
+        "PORT": "8742",
+        "DATA_DIR": "./data"
+      },
+      "port": 8742
+    }
+  ]
+}

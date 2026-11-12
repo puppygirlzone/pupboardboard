@@ -1,0 +1,25 @@
+# pupboard news feeds
+#
+# Copy this file to feeds.txt (same folder) and edit it:
+#   cp config/feeds.example.txt config/feeds.txt
+#
+# One feed per line, either:
+#   Name | https://example.com/feed.xml
+#   https://example.com/feed.xml          (the feed's own title is used)
+#
+# Lines starting with # are ignored, so you can comment feeds out.
+# Changes are picked up automatically; no restart needed.
+# Any RSS or Atom feed works. Up to 50 feeds.
+# Reddit limits how often its feeds can be fetched, so with several subreddits
+# one may show as "couldn't load" now and then; it recovers on its own.
+
+# --- Tech ---
+Hacker News | https://hnrss.org/frontpage
+Phoronix | https://www.phoronix.com/rss.php
+Ars Technica | https://feeds.arstechnica.com/arstechnica/index
+
+# --- More ideas (remove the # to turn one on) ---
+# r/selfhosted | https://www.reddit.com/r/selfhosted/.rss
+# r/homelab | https://www.reddit.com/r/homelab/.rss
+# Steam News | https://store.steampowered.com/feeds/news/
+# Jellyfin Blog | https://jellyfin.org/posts/rss.xml
