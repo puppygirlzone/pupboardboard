@@ -21,7 +21,8 @@ export function hostOf(url) {
   }
 }
 
-export async function fetchJson(fetchImpl, url, { timeoutMs = 8000, headers, method = 'GET', body } = {}) {
+/** allowEmpty: a 204 / empty body resolves to null instead of "invalid JSON". */
+export async function fetchJson(fetchImpl, url, { timeoutMs = 8000, headers, method = 'GET', body, allowEmpty = false } = {}) {
   let res;
   try {
     res = await fetchImpl(url, { method, headers, body, signal: AbortSignal.timeout(timeoutMs) });
@@ -30,6 +31,15 @@ export async function fetchJson(fetchImpl, url, { timeoutMs = 8000, headers, met
     throw new UpstreamError(`${hostOf(url)} ${reason}`);
   }
   if (!res.ok) throw new UpstreamError(`${hostOf(url)} returned HTTP ${res.status}`, res.status);
+  if (allowEmpty) {
+    const text = await res.text().catch(() => '');
+    if (res.status === 204 || !text.trim()) return null;
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new UpstreamError(`${hostOf(url)} returned invalid JSON`);
+    }
+  }
   try {
     return await res.json();
   } catch {

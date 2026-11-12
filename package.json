@@ -1,6 +1,6 @@
 {
   "name": "pupboard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Animated, glanceable stats homepage for your self-hosted services: Steam, Navidrome, Jellyfin and RSS",
   "main": "server/index.js",
   "scripts": {

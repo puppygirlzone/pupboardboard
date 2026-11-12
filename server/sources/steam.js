@@ -1,6 +1,6 @@
 // Steam Web API (free; key from https://steamcommunity.com/dev/apikey).
 
-import { fetchJson, settleAll } from '../resilience.js';
+import { fetchJson, settleAll, UpstreamError } from '../resilience.js';
 import { computeWeekly, trackingSince } from './steam-history.js';
 
 const API = 'https://api.steampowered.com';
@@ -9,6 +9,22 @@ export const steamImages = {
   icon: (appid, hash) => (hash ? `https://media.steampowered.com/steamcommunity/public/images/apps/${appid}/${hash}.jpg` : null),
   header: (appid) => `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`,
 };
+
+/**
+ * What people paste into "Steam profile": a 17-digit SteamID64, a profile link
+ * (steamcommunity.com/profiles/<id> or /id/<name>), or just the custom name.
+ * Returns { id } or { vanity }, or null if it can't be one of those.
+ */
+export function parseSteamProfile(value) {
+  const v = String(value ?? '').trim();
+  if (/^\d{17}$/.test(v)) return { id: v };
+  const link = v.match(/^(?:https?:\/\/)?(?:www\.)?steamcommunity\.com\/(profiles|id)\/([^/?#\s]+)\/?(?:[?#].*)?$/i);
+  if (link) {
+    if (link[1].toLowerCase() === 'profiles') return /^\d{17}$/.test(link[2]) ? { id: link[2] } : null;
+    return /^[A-Za-z0-9_-]{2,32}$/.test(link[2]) ? { vanity: link[2] } : null;
+  }
+  return /^[A-Za-z0-9_-]{2,32}$/.test(v) ? { vanity: v } : null;
+}
 
 /** Demo mode: invented games get local placeholder art instead of Steam's CDN. */
 export function withDemoArt(data) {
@@ -102,20 +118,35 @@ export function buildSteamData({ recent, owned, player, snapshots, now, warnings
 }
 
 export function createSteamLoader({ config, fetchImpl, history, now = Date.now }) {
-  const { apiKey, steamId } = config.steam;
+  const { apiKey } = config.steam;
   const opts = { timeoutMs: config.timeoutMs };
-  const auth = `key=${encodeURIComponent(apiKey)}&steamid=${encodeURIComponent(steamId)}&format=json`;
+  const profile = parseSteamProfile(config.steam.steamId);
+  let steamId = profile?.id ?? null;
+
+  // A custom profile name is looked up once (Steam's own vanity-name lookup).
+  async function resolveId() {
+    if (steamId) return steamId;
+    if (!profile) throw new UpstreamError('Steam profile not recognised: paste your profile link or 17-digit SteamID64');
+    const json = await fetchJson(fetchImpl, `${API}/ISteamUser/ResolveVanityURL/v1/?key=${encodeURIComponent(apiKey)}&vanityurl=${encodeURIComponent(profile.vanity)}`, opts);
+    if (json?.response?.success !== 1 || !/^\d{17}$/.test(String(json.response.steamid ?? ''))) {
+      throw new UpstreamError(`No Steam profile called "${profile.vanity}"`);
+    }
+    steamId = String(json.response.steamid);
+    return steamId;
+  }
 
   const memory = {}; // last good value of each sub-request
 
   return async function loadSteam() {
+    const id = await resolveId();
+    const auth = `key=${encodeURIComponent(apiKey)}&steamid=${encodeURIComponent(id)}&format=json`;
     const { values, warnings } = await settleAll({
       recent: async () => normalizeRecent(await fetchJson(fetchImpl, `${API}/IPlayerService/GetRecentlyPlayedGames/v1/?${auth}`, opts)),
       owned: async () =>
         normalizeOwned(await fetchJson(fetchImpl, `${API}/IPlayerService/GetOwnedGames/v1/?${auth}&include_appinfo=1&include_played_free_games=1`, opts)),
       player: async () =>
         normalizePlayer(
-          await fetchJson(fetchImpl, `${API}/ISteamUser/GetPlayerSummaries/v2/?key=${encodeURIComponent(apiKey)}&steamids=${encodeURIComponent(steamId)}`, opts),
+          await fetchJson(fetchImpl, `${API}/ISteamUser/GetPlayerSummaries/v2/?key=${encodeURIComponent(apiKey)}&steamids=${encodeURIComponent(id)}`, opts),
         ),
     }, memory);
     if (!values.recent && !values.owned) throw new Error(warnings.join('; ') || 'Steam returned no game data');

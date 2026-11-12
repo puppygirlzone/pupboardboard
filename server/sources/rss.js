@@ -5,9 +5,10 @@ import { readFileSync, statSync } from 'node:fs';
 import { fetchText, settleAll, UpstreamError } from '../resilience.js';
 
 export const DEFAULT_FEEDS = [
-  { name: 'Hacker News', url: 'https://hnrss.org/frontpage' },
-  { name: 'Phoronix', url: 'https://www.phoronix.com/rss.php' },
-  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index' },
+  { name: 'Steam News', url: 'https://store.steampowered.com/feeds/news/app/593110/' },
+  { name: 'GamingOnLinux', url: 'https://www.gamingonlinux.com/article_rss.php' },
+  { name: 'Game Deals', url: 'https://www.reddit.com/r/GameDeals/.rss' },
+  { name: 'Rock Paper Shotgun', url: 'https://www.rockpapershotgun.com/feed' },
 ];
 export const MAX_FEEDS = 50;
 
@@ -103,7 +104,7 @@ export function decodeEntities(text) {
 }
 
 /** Text content of the first <tag> (namespaced tags allowed), CDATA unwrapped. */
-function tagText(block, tag) {
+export function tagText(block, tag) {
   const name = tag.replace(':', '\\:');
   const m = block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, 'i'));
   if (!m) return null;
@@ -141,7 +142,7 @@ function atomLink(block) {
   return href ? decodeEntities(href) : null;
 }
 
-const safeLink = (value) => {
+export const safeLink = (value) => {
   const v = value?.trim();
   return v && isHttpUrl(v) ? v : null;
 };

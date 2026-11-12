@@ -15,21 +15,41 @@ const SECTIONS = [
     id: 'steam',
     title: 'Gaming (Steam)',
     help: [
-      'Get a free Web API key at ',
+      'Paste your Steam profile link (open your profile in Steam, right-click the page and copy its address). Steam also needs a free Web API key from ',
       ['steamcommunity.com/dev/apikey', 'https://steamcommunity.com/dev/apikey'],
-      ' (for “Domain name” anything works, e.g. localhost). Your SteamID64 is the 17-digit number shown at ',
-      ['steamid.io', 'https://steamid.io'],
-      '. In Steam, set your profile’s “Game details” privacy to Public.',
+      ' (for “Domain name” anything works, e.g. localhost). In Steam, set your profile’s “Game details” privacy to Public.',
+    ],
+  },
+  { id: 'music', title: 'Music card', help: ['Which service the Music card shows. “Automatic” uses the first one below that is set up.'] },
+  {
+    id: 'listenbrainz',
+    title: 'Spotify, the easy way (ListenBrainz)',
+    help: [
+      'No keys needed. Make a free account at ',
+      ['listenbrainz.org', 'https://listenbrainz.org'],
+      ', go to Settings → Music services and connect Spotify. Then type your ListenBrainz username here. New plays show up within a few minutes.',
+    ],
+  },
+  {
+    id: 'spotify',
+    title: 'Spotify, direct (optional)',
+    help: [
+      'Live “now playing” straight from Spotify. Spotify only allows this with Spotify Premium and your own free developer app: ',
+      ['open the Spotify developer dashboard', 'https://developer.spotify.com/dashboard'],
+      ', press Create app, give it any name, paste the Redirect URI below, tick “Web API”, and save. Copy the app’s Client ID here, press Save, then Connect Spotify.',
     ],
   },
   {
     id: 'navidrome',
     title: 'Music (Navidrome)',
-    help: ['The address you open Navidrome at (for example http://192.168.1.10:4533) and your normal Navidrome login.'],
+    help: ['For your own music server: the address you open Navidrome at (for example http://192.168.1.10:4533) and your normal Navidrome login.'],
   },
+  { id: 'media', title: 'Media card', help: ['Which service the Media card shows. “Automatic” uses Jellyfin if it is set up, then Letterboxd, then game deals.'] },
+  { id: 'deals', title: 'Game deals', help: ['Free-to-keep PC games and the best Steam sales. Nothing to set up.'] },
+  { id: 'letterboxd', title: 'Films (Letterboxd)', help: ['Films you log on ', ['letterboxd.com', 'https://letterboxd.com'], '. Just your username (or paste your profile link), no keys.'] },
   {
     id: 'jellyfin',
-    title: 'Media (Jellyfin)',
+    title: 'Media server (Jellyfin)',
     help: ['The address you open Jellyfin at (for example http://192.168.1.10:8096). Make an API key in Jellyfin: Dashboard → API Keys → +.'],
   },
   { id: 'news', title: 'News (RSS)', help: ['One feed per line, as “Name | https://address-of-the-feed”. Lines starting with # are ignored. Empty = no news card.'] },
@@ -38,6 +58,15 @@ const SECTIONS = [
 ];
 
 const CHOICE_LABELS = {
+  auto: 'Automatic',
+  navidrome: 'Navidrome',
+  spotify: 'Spotify (direct)',
+  listenbrainz: 'Spotify via ListenBrainz',
+  jellyfin: 'Jellyfin',
+  letterboxd: 'Letterboxd films',
+  deals: 'Game deals and free games',
+  on: 'On',
+  off: 'Off',
   '24h': '24-hour (14:30)',
   '12h': '12-hour (2:30 PM)',
   '127.0.0.1': 'Only this computer',
@@ -91,6 +120,15 @@ function takeCode() {
 }
 let code = takeCode();
 
+// Back from Spotify's sign-in page (?spotify=connected|denied|error).
+const spotifyResult = new URLSearchParams(location.search).get('spotify');
+if (spotifyResult) history.replaceState(null, '', location.pathname);
+const SPOTIFY_MESSAGES = {
+  connected: 'Spotify is connected. The Music card will show it within a minute.',
+  denied: 'Spotify sign-in was cancelled.',
+  error: 'Spotify sign-in didn’t work. Check the Client ID and Redirect URI in your Spotify app, then try again. If you’re not the app’s owner, add your Spotify email under “User Management” in the app.',
+};
+
 const api = (init = {}) => fetch('/api/setup', { cache: 'no-store', ...init, headers: { 'x-setup-code': code, ...(init.headers ?? {}) } });
 
 /* ------------------------------------------------------------ messages */
@@ -120,6 +158,46 @@ function codePrompt() {
 /* ------------------------------------------------------------ the form */
 
 let state = null;
+
+function spotifyBlock(data) {
+  const sp = data.spotify ?? {};
+  const field = data.fields.find((f) => f.key === 'SPOTIFY_CLIENT_ID');
+  const uri = el('input', { type: 'text', class: 'setup-input', readonly: true, value: sp.redirectUri ?? '', 'aria-label': 'Redirect URI for your Spotify app' });
+  const copy = el('button', { type: 'button', class: 'setup-link', text: 'Copy' });
+  copy.addEventListener('click', async () => {
+    uri.select();
+    try {
+      await navigator.clipboard.writeText(uri.value);
+      copy.textContent = 'Copied';
+    } catch {
+      copy.textContent = 'Select and copy it';
+    }
+  });
+  const parts = [el('label', { text: 'Redirect URI (paste this into your Spotify app)' }), el('div', { class: 'setup-row' }, [uri, copy])];
+  const status = el('p', { class: 'small', text: sp.connected ? `Connected${sp.connectedAt ? ` since ${new Date(sp.connectedAt).toLocaleDateString()}` : ''}.` : field?.isSet ? 'Not connected yet.' : 'Save your Client ID first, then connect.' });
+  const connect = el('button', { type: 'button', class: 'setup-button', text: sp.connected ? 'Reconnect Spotify' : 'Connect Spotify', disabled: !field?.isSet });
+  connect.addEventListener('click', async () => {
+    connect.disabled = true;
+    const res = await fetch('/api/spotify/login', { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', 'x-setup-code': code }, body: '{}' }).catch(() => null);
+    const out = res ? await res.json().catch(() => ({})) : {};
+    if (res?.ok && typeof out.url === 'string' && out.url.startsWith('https://accounts.spotify.com/')) {
+      location.href = out.url;
+      return;
+    }
+    connect.disabled = false;
+    status.textContent = out.error ?? 'Couldn’t start the Spotify sign-in.';
+  });
+  const buttons = [connect];
+  if (sp.connected) {
+    const off = el('button', { type: 'button', class: 'setup-link', text: 'Disconnect' });
+    off.addEventListener('click', async () => {
+      await fetch('/api/spotify/disconnect', { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', 'x-setup-code': code }, body: '{}' }).catch(() => null);
+      load({ quiet: true });
+    });
+    buttons.push(off);
+  }
+  return el('div', { class: 'setup-field' }, [...parts, el('div', { class: 'setup-row setup-connect' }, buttons), status]);
+}
 
 function fieldControl(f, currentHost) {
   const id = `f-${f.key}`;
@@ -171,6 +249,10 @@ function render(data) {
       box.append(el('label', { for: 'f-feeds', class: 'visually-hidden', text: 'News feeds' }), area, el('p', { class: 'setup-error small', id: 'err-feeds', hidden: true }));
     }
     for (const f of data.fields.filter((x) => x.section === section.id)) box.append(fieldControl(f, data.host));
+    if (section.id === 'spotify') box.append(spotifyBlock(data));
+    if ((section.id === 'music' || section.id === 'media') && data.slots) {
+      box.append(el('p', { class: 'muted small', text: `Showing now: ${CHOICE_LABELS[data.slots[section.id]] ?? data.slots[section.id]}.` }));
+    }
     form.append(box);
   }
   const save = el('button', { type: 'submit', class: 'setup-button setup-save', text: 'Save' });
@@ -253,7 +335,8 @@ async function load({ quiet = false } = {}) {
     if (res.status === 403) return refuse((await res.json().catch(() => ({}))).error);
     if (!res.ok) throw new Error(String(res.status));
     render(await res.json());
-    if (!quiet) showStatus('info', 'Fill in what you use, then press Save at the bottom.');
+    if (!quiet && spotifyResult && SPOTIFY_MESSAGES[spotifyResult]) showStatus(spotifyResult === 'connected' ? 'ok' : 'error', SPOTIFY_MESSAGES[spotifyResult]);
+    else if (!quiet) showStatus('info', 'Fill in what you use, then press Save at the bottom.');
   } catch {
     showStatus('error', 'Couldn’t reach pupboard. Is it still running?');
   }

@@ -13,12 +13,19 @@
 # Reddit limits how often its feeds can be fetched, so with several subreddits
 # one may show as "couldn't load" now and then; it recovers on its own.
 
-# --- Tech ---
-Hacker News | https://hnrss.org/frontpage
-Phoronix | https://www.phoronix.com/rss.php
-Ars Technica | https://feeds.arstechnica.com/arstechnica/index
+# --- Gaming (the built-in defaults) ---
+Steam News | https://store.steampowered.com/feeds/news/app/593110/
+GamingOnLinux | https://www.gamingonlinux.com/article_rss.php
+Game Deals | https://www.reddit.com/r/GameDeals/.rss
+Rock Paper Shotgun | https://www.rockpapershotgun.com/feed
 
 # --- More ideas (remove the # to turn one on) ---
+# Boiling Steam (Linux gaming) | https://boilingsteam.com/feed/
+# PC Gamer | https://www.pcgamer.com/rss/
+# r/linux_gaming | https://www.reddit.com/r/linux_gaming/.rss
+# A game's own Steam news (swap in its app id from the store page URL):
+# My game | https://store.steampowered.com/feeds/news/app/APPID/
+# Hacker News | https://hnrss.org/frontpage
 # r/selfhosted | https://www.reddit.com/r/selfhosted/.rss
 # r/homelab | https://www.reddit.com/r/homelab/.rss
 # Steam News | https://store.steampowered.com/feeds/news/

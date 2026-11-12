@@ -88,7 +88,7 @@ export function computeListeningStats(recentSongs, now) {
     // Navidrome keeps only the latest play per song, so this is a lower bound.
     minutesThisWeek: Math.round(thisWeek.reduce((sum, s) => sum + s.duration, 0) / 60),
     topArtists: topBy(thisWeek, (s) => s.artist, (s) => ({ name: s.artist })),
-    topAlbums: topBy(thisWeek, (s) => s.albumId ?? s.album, (s) => ({ name: s.album, artist: s.artist, coverId: s.coverId })),
+    topAlbums: topBy(thisWeek, (s) => s.albumId ?? s.album, (s) => ({ name: s.album, artist: s.artist, coverId: s.coverId, art: s.art ?? null })),
     topGenres: topBy(thisWeek, (s) => s.genre, (s) => ({ name: s.genre })),
   };
 }

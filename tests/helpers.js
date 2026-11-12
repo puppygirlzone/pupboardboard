@@ -44,7 +44,7 @@ export function baseConfig(overrides = {}) {
     demo: false,
     timeoutMs: 200,
     refreshMinutes: 30,
-    steam: { apiKey: 'SECRETKEY', steamId: '123', ttlMs: 60_000 },
+    steam: { apiKey: 'SECRETKEY', steamId: '76561190000000001', ttlMs: 60_000 },
     navidrome: { url: 'http://nd.local', user: 'me', password: 'pw', ttlMs: 60_000 },
     jellyfin: { url: 'http://jf.local', apiKey: 'JFKEY', ttlMs: 60_000 },
     rss: { ttlMs: 60_000, list: () => ({ feeds: [{ name: 'Feed', url: 'http://rss.local/feed' }], from: 'env' }) },

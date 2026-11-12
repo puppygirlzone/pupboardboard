@@ -1,4 +1,5 @@
-// A fake fetch() that pretends to be Steam, Navidrome, Jellyfin and RSS feeds.
+// A fake fetch() that pretends to be Steam, Navidrome, Jellyfin, Spotify,
+// ListenBrainz, Letterboxd, the deal sites and RSS feeds.
 // It fails some requests on purpose (errors, timeouts, bad JSON) so the
 // dashboard's error handling gets exercised. Used by `npm run demo` and tests.
 
@@ -120,6 +121,36 @@ export function demoArtSvg(seed, { width = 300, height = 300 } = {}) {
 const coverSvg = (seed) => demoArtSvg(seed);
 
 const json = (body) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+const art = (seed, w = 300, h = 300) => `/api/demo-art/${seed}?w=${w}&h=${h}`;
+const albumSeed = (album) => `al-${album.replace(/\W/g, '').toLowerCase()}`;
+
+// Spotify-shaped track from a demo song.
+const spotifyTrack = (s) => ({
+  id: s.id,
+  name: s.title,
+  duration_ms: s.duration * 1000,
+  artists: [{ name: s.artist }],
+  album: { id: s.albumId, name: s.album, images: [{ url: art(albumSeed(s.album), 300, 300), width: 300, height: 300 }] },
+});
+// ListenBrainz-shaped listen from a demo song.
+const listen = (s) => ({
+  listened_at: Math.floor(Date.parse(s.playDate) / 1000),
+  recording_msid: `msid-${s.id}`,
+  track_metadata: { artist_name: s.artist, track_name: s.title, release_name: s.album, additional_info: { duration_ms: s.duration * 1000, demo_art: art(albumSeed(s.album), 250, 250) } },
+});
+
+const FREEBIES = [
+  ['Starlit Orchard', 'Epic Games Store', 24.99, 5],
+  ['Copper Keep', 'GOG', 14.99, 2],
+  ['Neon Courier', 'Steam', 9.99, 9],
+];
+const SALES = [
+  ['Moss Garden Tycoon', 19.99, 4.99, 96],
+  ['Frostline Outpost', 29.99, 8.99, 91],
+  ['Puzzle Orbit', 12.99, 2.59, 94],
+  ['Harbor Lights Deluxe', 39.99, 15.99, 88],
+  ['Pupperton', 24.99, 12.49, 98],
+];
 const subsonic = (body) => json({ 'subsonic-response': { status: 'ok', version: '1.16.1', ...body } });
 
 function route(url, now) {
@@ -162,6 +193,64 @@ function route(url, now) {
     if (p === '/System/Info/Public') return json({ ServerName: 'demo-media', Version: '10.10.0' });
     const img = p.match(/^\/Items\/([^/]+)\/Images\/Primary$/);
     if (img) return new Response(coverSvg(img[1]), { headers: { 'content-type': 'image/svg+xml' } });
+  }
+  if (u.host === 'api.listenbrainz.org') {
+    const all = songs(now);
+    if (p === '/1/user/demo/listens') {
+      const min = Number(u.searchParams.get('min_ts')) || 0;
+      const listens = all.map(listen).filter((l) => l.listened_at >= min);
+      return json({ payload: { count: listens.length, user_id: 'demo', listens } });
+    }
+    if (p === '/1/user/demo/playing-now') {
+      const s = all[Math.floor(now / (3 * MIN)) % all.length];
+      return json({ payload: { count: 1, playing_now: true, listens: [{ playing_now: true, track_metadata: listen(s).track_metadata }] } });
+    }
+    if (p === '/1/stats/user/demo/recordings') {
+      const top = [...all].sort((a, b) => b.playCount - a.playCount).slice(0, 10);
+      return json({ payload: { recordings: top.map((s) => ({ track_name: s.title, artist_name: s.artist, release_name: s.album, listen_count: s.playCount })) } });
+    }
+  }
+  if (u.host === 'api.spotify.com') {
+    const all = songs(now);
+    if (p === '/v1/me/player/currently-playing') return json({ is_playing: true, currently_playing_type: 'track', item: spotifyTrack(all[Math.floor(now / (3 * MIN)) % all.length]) });
+    if (p === '/v1/me/player/recently-played') return json({ items: all.slice(0, 50).map((s) => ({ played_at: s.playDate, track: spotifyTrack(s) })) });
+    if (p === '/v1/me/top/tracks') return json({ items: [...all].sort((a, b) => b.playCount - a.playCount).slice(0, 10).map(spotifyTrack) });
+  }
+  if (u.host === 'www.gamerpower.com' && p === '/api/giveaways') {
+    return json(
+      FREEBIES.map(([title, store, worth, days], i) => ({
+        id: 9100 + i,
+        title: `${title} (${store}) Giveaway`,
+        worth: `$${worth}`,
+        thumbnail: art(`free-${i}`, 460, 215),
+        open_giveaway_url: `https://example.com/free/${i}`,
+        platforms: `PC, ${store}`,
+        end_date: new Date(now + days * DAY).toISOString().replace('T', ' ').slice(0, 19),
+        status: 'Active',
+      })),
+    );
+  }
+  if (u.host === 'www.cheapshark.com' && p === '/api/1.0/deals') {
+    return json(
+      SALES.map(([title, normal, sale, rating], i) => ({
+        title,
+        dealID: `demo-deal-${i}`,
+        salePrice: sale.toFixed(2),
+        normalPrice: normal.toFixed(2),
+        savings: String(((1 - sale / normal) * 100).toFixed(4)),
+        steamAppID: String(9900010 + i),
+        thumb: art(`deal-${i}`, 231, 87),
+        steamRatingPercent: String(rating),
+      })),
+    );
+  }
+  if (u.host === 'letterboxd.com' && p === '/demo/rss/') {
+    const items = MOVIES.map((name, i) => {
+      const watched = new Date(now - (i * 2.5 + 0.5) * DAY).toISOString().slice(0, 10);
+      const rating = [4.5, 3.5, 5, 4, 3, 4.5][i % 6];
+      return `<item><title>${name}, ${2000 + i * 4}</title><link>https://example.com/film/${i}/</link><letterboxd:watchedDate>${watched}</letterboxd:watchedDate><letterboxd:rewatch>${i === 2 ? 'Yes' : 'No'}</letterboxd:rewatch><letterboxd:filmTitle>${name}</letterboxd:filmTitle><letterboxd:filmYear>${2000 + i * 4}</letterboxd:filmYear><letterboxd:memberRating>${rating}</letterboxd:memberRating><letterboxd:memberLike>${i % 2 ? 'Yes' : 'No'}</letterboxd:memberLike><description><![CDATA[ <p><img src="${art(`film-${i}`, 200, 300)}"/></p> <p>Watched on a demo day.</p> ]]></description></item>`;
+    }).join('');
+    return new Response(`<?xml version="1.0"?><rss version="2.0" xmlns:letterboxd="https://letterboxd.com"><channel><title>Letterboxd - Demo</title>${items}</channel></rss>`, { headers: { 'content-type': 'application/rss+xml' } });
   }
   if (u.host === 'feeds.demo') {
     const xml = (body) => new Response(body, { headers: { 'content-type': 'application/xml' } });

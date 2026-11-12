@@ -24,6 +24,10 @@ export function validTimeZone(value) {
   }
 }
 
+export const MUSIC_SOURCES = ['navidrome', 'spotify', 'listenbrainz'];
+export const MEDIA_SOURCES = ['jellyfin', 'letterboxd', 'deals'];
+const oneOf = (value, list) => (list.includes(str(value).toLowerCase()) ? str(value).toLowerCase() : 'auto');
+
 export function loadConfig(env = process.env) {
   const config = {
     port: positive(env.PORT, 8742),
@@ -62,6 +66,27 @@ export function loadConfig(env = process.env) {
       file: str(env.RSS_FEEDS_FILE) || './config/feeds.txt',
       ttlMs: positive(env.RSS_CACHE_SECONDS, 900) * 1000,
     },
+    listenbrainz: {
+      user: str(env.LISTENBRAINZ_USER),
+      ttlMs: positive(env.LISTENBRAINZ_CACHE_SECONDS, 120) * 1000,
+    },
+    spotify: {
+      clientId: str(env.SPOTIFY_CLIENT_ID),
+      ttlMs: positive(env.SPOTIFY_CACHE_SECONDS, 30) * 1000,
+    },
+    letterboxd: {
+      user: str(env.LETTERBOXD_USER),
+      ttlMs: positive(env.LETTERBOXD_CACHE_SECONDS, 1800) * 1000,
+    },
+    deals: {
+      enabled: !/^(0|off|false|no)$/i.test(str(env.DEALS)),
+      ttlMs: positive(env.DEALS_CACHE_SECONDS, 1800) * 1000,
+    },
+    // Which source fills the Music and Media cards ("auto" = first one set up).
+    slots: {
+      music: oneOf(env.MUSIC_SOURCE, MUSIC_SOURCES),
+      media: oneOf(env.MEDIA_SOURCE, MEDIA_SOURCES),
+    },
   };
 
   if (config.demo) {
@@ -69,6 +94,10 @@ export function loadConfig(env = process.env) {
     config.steam = { ...config.steam, apiKey: 'demo', steamId: '76561190000000000' };
     config.navidrome = { ...config.navidrome, url: 'http://navidrome.demo', user: 'demo', password: 'demo' };
     config.jellyfin = { ...config.jellyfin, url: 'http://jellyfin.demo', apiKey: 'demo' };
+    config.listenbrainz = { ...config.listenbrainz, user: 'demo' };
+    config.spotify = { ...config.spotify, clientId: '0123456789abcdef0123456789abcdef', isConnected: () => true };
+    config.letterboxd = { ...config.letterboxd, user: 'demo' };
+    config.deals = { ...config.deals, enabled: true };
     config.rss = {
       ...config.rss,
       demoFeeds: [
@@ -88,4 +117,22 @@ export const isConfigured = {
   navidrome: (c) => Boolean(c.navidrome.url && c.navidrome.user && c.navidrome.password),
   jellyfin: (c) => Boolean(c.jellyfin.url && c.jellyfin.apiKey),
   rss: (c) => c.rss.list().feeds.length > 0,
+  listenbrainz: (c) => Boolean(c.listenbrainz?.user),
+  // Needs a Client ID and a finished "Connect Spotify" (app.js sets isConnected).
+  spotify: (c) => Boolean(c.spotify?.clientId && c.spotify.isConnected?.()),
+  letterboxd: (c) => Boolean(c.letterboxd?.user),
+  deals: (c) => Boolean(c.deals?.enabled),
 };
+
+/**
+ * The source shown on each card. A chosen source wins (even if it isn't set
+ * up yet, so its card can say how). "auto" picks the first one set up, in
+ * list order; with none set up, the card explains the options.
+ */
+export function resolveSlots(c) {
+  const pick = (choice, list, fallback) => (choice && choice !== 'auto' ? choice : list.find((k) => isConfigured[k](c)) ?? fallback);
+  return {
+    music: pick(c.slots?.music, MUSIC_SOURCES, 'listenbrainz'),
+    media: pick(c.slots?.media, MEDIA_SOURCES, 'deals'),
+  };
+}

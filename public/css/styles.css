@@ -428,3 +428,11 @@ p.setup-error { color: var(--err-ink); margin: 4px 0 0; }
 .settings-link:hover { border-color: var(--border-strong); color: var(--text); }
 .settings-link:focus-visible { outline: 2px solid var(--steam-ink); outline-offset: 2px; }
 .settings-link svg { width: 18px; height: 18px; }
+
+/* ---------------------------------------------------------------- Card slots */
+/* Which service fills the Music / Media card, shown next to the title. */
+.via { font-size: 0.72rem; font-weight: 600; color: var(--muted); padding: 2px 8px; border-radius: 999px; background: var(--track); }
+.page-head .via { font-size: 0.8rem; vertical-align: middle; }
+.tile-poster { aspect-ratio: 2 / 3; }
+.row-title a:hover, .tile a:hover { text-decoration: underline; }
+s { text-decoration-thickness: 1px; }

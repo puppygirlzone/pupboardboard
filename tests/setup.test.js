@@ -93,7 +93,7 @@ test('applyChanges validates, keeps blank secrets, clears on request, skips lock
   assert.deepEqual(ok.settings, { STEAM_API_KEY: 'old', STEAM_ID: '76561198000000000', NAVIDROME_URL: 'http://nd.local:4533', TIME_ZONE: 'Europe/London', HOST: '0.0.0.0' });
 
   const bad = applyChanges({}, {
-    values: { STEAM_ID: '123', NAVIDROME_URL: 'javascript:alert(1)', JELLYFIN_URL: 'http://user:pw@host', TIME_ZONE: 'Mars/Base', CLOCK_FORMAT: '13h', NAVIDROME_USER: 'a\nb', HOST: '8.8.8.8', STEAM_API_KEY: 7 },
+    values: { STEAM_ID: 'not a profile!', NAVIDROME_URL: 'javascript:alert(1)', JELLYFIN_URL: 'http://user:pw@host', TIME_ZONE: 'Mars/Base', CLOCK_FORMAT: '13h', NAVIDROME_USER: 'a\nb', HOST: '8.8.8.8', STEAM_API_KEY: 7 },
   });
   assert.deepEqual(bad.errors.map((e) => e.key).sort(), ['CLOCK_FORMAT', 'HOST', 'JELLYFIN_URL', 'NAVIDROME_URL', 'NAVIDROME_USER', 'STEAM_API_KEY', 'STEAM_ID', 'TIME_ZONE']);
   for (const junk of [null, 'x', { values: 'x' }, { values: null, clear: 'x' }]) assert.deepEqual(applyChanges({ A: 1 }, junk).errors, []);
@@ -106,7 +106,7 @@ test('setup API: saves, applies without a restart, and never returns secrets', a
   try {
     const before = await (await s.call()).json();
     assert.equal(before.feeds.exists, false);
-    assert.match(before.feeds.text, /Hacker News \| https:\/\/hnrss.org\/frontpage/, 'shows the default feeds when there is no file');
+    assert.match(before.feeds.text, /Steam News \| https:\/\/store\.steampowered\.com\/feeds\/news\/app\/593110\//, 'shows the default feeds when there is no file');
 
     const res = await s.post({
       values: { NAVIDROME_URL: 'http://nd.local', NAVIDROME_USER: 'me', NAVIDROME_PASSWORD: 'hunter2', CLOCK_FORMAT: '12h' },
@@ -137,7 +137,7 @@ test('setup API: saves, applies without a restart, and never returns secrets', a
 test('setup API: validation errors save nothing', async () => {
   const s = await startSetupApp();
   try {
-    const res = await s.post({ values: { STEAM_ID: 'nope', NAVIDROME_USER: 'me' } });
+    const res = await s.post({ values: { STEAM_ID: 'not a profile!', NAVIDROME_USER: 'me' } });
     assert.equal(res.status, 400);
     assert.equal((await res.json()).errors[0].key, 'STEAM_ID');
     assert.deepEqual(readSettings(s.file), {});

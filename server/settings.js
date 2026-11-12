@@ -10,16 +10,41 @@
 import { readFileSync } from 'node:fs';
 import { writeFile, rename, mkdir, chmod } from 'node:fs/promises';
 import path from 'node:path';
-import { validTimeZone } from './config.js';
+import { validTimeZone, MUSIC_SOURCES, MEDIA_SOURCES } from './config.js';
+import { parseSteamProfile } from './sources/steam.js';
+import { validListenBrainzUser } from './sources/listenbrainz.js';
+import { validLetterboxdUser } from './sources/letterboxd.js';
+import { validSpotifyClientId } from './sources/spotify.js';
+
+// People paste profile links; keep just the username.
+const fromLink = (pattern) => (v) => v.match(pattern)?.[1] ?? v;
 
 export const SETTINGS_FIELDS = [
+  { key: 'STEAM_ID', section: 'steam', label: 'Steam profile link (or SteamID64)' },
   { key: 'STEAM_API_KEY', section: 'steam', label: 'Steam Web API key', secret: true },
-  { key: 'STEAM_ID', section: 'steam', label: 'SteamID64 (17 digits)' },
+  { key: 'MUSIC_SOURCE', section: 'music', label: 'Show on the Music card', choices: ['auto', ...MUSIC_SOURCES] },
+  {
+    key: 'LISTENBRAINZ_USER',
+    section: 'listenbrainz',
+    label: 'ListenBrainz username',
+    normalize: fromLink(/^(?:https?:\/\/)?(?:www\.)?listenbrainz\.org\/user\/([^/?#]+)/i),
+    check: (v) => (validListenBrainzUser(v) ? null : 'is not a valid ListenBrainz username'),
+  },
+  { key: 'SPOTIFY_CLIENT_ID', section: 'spotify', label: 'Spotify Client ID', check: (v) => (validSpotifyClientId(v) ? null : 'should be the 32-character Client ID from your Spotify app') },
   { key: 'NAVIDROME_URL', section: 'navidrome', label: 'Navidrome address', url: true },
   { key: 'NAVIDROME_USER', section: 'navidrome', label: 'Navidrome username' },
   { key: 'NAVIDROME_PASSWORD', section: 'navidrome', label: 'Navidrome password', secret: true },
   { key: 'JELLYFIN_URL', section: 'jellyfin', label: 'Jellyfin address', url: true },
   { key: 'JELLYFIN_API_KEY', section: 'jellyfin', label: 'Jellyfin API key', secret: true },
+  { key: 'MEDIA_SOURCE', section: 'media', label: 'Show on the Media card', choices: ['auto', ...MEDIA_SOURCES] },
+  {
+    key: 'LETTERBOXD_USER',
+    section: 'letterboxd',
+    label: 'Letterboxd username',
+    normalize: fromLink(/^(?:https?:\/\/)?(?:www\.)?letterboxd\.com\/([A-Za-z0-9_]+)/i),
+    check: (v) => (validLetterboxdUser(v) ? null : 'is not a valid Letterboxd username (letters, numbers and _ only)'),
+  },
+  { key: 'DEALS', section: 'deals', label: 'Game deals and free games', choices: ['on', 'off'] },
   { key: 'TIME_ZONE', section: 'clock', label: 'Time zone' },
   { key: 'CLOCK_FORMAT', section: 'clock', label: 'Clock format', choices: ['24h', '12h'] },
   { key: 'HOST', section: 'network', label: 'Who can open the dashboard', choices: ['127.0.0.1', '0.0.0.0'], restart: true },
@@ -98,7 +123,8 @@ function checkValue(field, value) {
   if (/[\r\n\0]/.test(value)) return 'must be a single line';
   if (field.url && !isHttpUrl(value)) return 'must start with http:// or https:// (for example http://192.168.1.10:4533)';
   if (field.choices && !field.choices.includes(value)) return 'is not one of the options';
-  if (field.key === 'STEAM_ID' && !/^\d{17}$/.test(value)) return 'should be 17 digits, like 76561198000000000';
+  if (field.key === 'STEAM_ID' && !parseSteamProfile(value)) return 'should be your profile link, like https://steamcommunity.com/id/yourname';
+  if (field.check) return field.check(value);
   if (field.key === 'TIME_ZONE' && !validTimeZone(value)) return 'is not a known time zone (try a name like Europe/London)';
   return null;
 }
@@ -125,7 +151,8 @@ export function applyChanges(saved, request, env = {}) {
       errors.push({ key, message: `${field.label} must be text` });
       continue;
     }
-    const value = field.url ? raw.trim().replace(/\/+$/, '') : raw.trim();
+    let value = field.url ? raw.trim().replace(/\/+$/, '') : raw.trim();
+    if (field.normalize && value) value = field.normalize(value);
     if (field.secret && value === '') continue; // keep the current secret
     const problem = checkValue(field, value);
     if (problem) errors.push({ key, message: `${field.label} ${problem}` });
