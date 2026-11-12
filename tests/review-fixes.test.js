@@ -17,34 +17,35 @@ import { stubFetch, json, tempDir, fakeClock, baseConfig, NO_FEEDS_FILE } from '
 
 const NOW = Date.parse('2026-11-12T12:00:00Z');
 
-test('feed parsing stays fast on hostile input (no quadratic regexes)', () => {
-  const attacks = [
-    `<rss>${'<item>'.repeat(500_000)}`,
-    `<rss><item><title>${'<title>'.repeat(400_000)}</item>`,
-    `<rss><item><description>${'&lt;script '.repeat(300_000)}</description></item>`,
-    `<rss><item><title>${'<![CDATA['.repeat(300_000)}</title></item>`,
-  ];
-  for (const xml of attacks) {
-    const t = Date.now();
-    try {
-      parseFeed(xml);
-    } catch {
-      /* rejecting is fine too; hanging is not */
+test('feed parsing: linear time on hostile input; caps, script removal and CDATA still work', () => {
+  {
+    const attacks = [
+      `<rss>${'<item>'.repeat(500_000)}`,
+      `<rss><item><title>${'<title>'.repeat(400_000)}</item>`,
+      `<rss><item><description>${'&lt;script '.repeat(300_000)}</description></item>`,
+      `<rss><item><title>${'<![CDATA['.repeat(300_000)}</title></item>`,
+    ];
+    for (const xml of attacks) {
+      const t = Date.now();
+      try {
+        parseFeed(xml);
+      } catch {
+        /* rejecting is fine too; hanging is not */
+      }
+      assert.ok(Date.now() - t < 1000, `${xml.slice(0, 30)}… took ${Date.now() - t} ms`);
     }
-    assert.ok(Date.now() - t < 1000, `${xml.slice(0, 30)}… took ${Date.now() - t} ms`);
+    const t = Date.now();
+    parseDiary(`<rss>${'<item>'.repeat(500_000)}`);
+    assert.ok(Date.now() - t < 1000);
   }
-  const t = Date.now();
-  parseDiary(`<rss>${'<item>'.repeat(500_000)}`);
-  assert.ok(Date.now() - t < 1000);
-});
-
-test('feed parsing: item cap, script/style removal and CDATA still work', () => {
-  const many = `<rss><channel>${'<item><title>x</title></item>'.repeat(500)}</channel></rss>`;
-  assert.equal(parseFeed(many).items.length, 200, 'at most 200 items');
-  const feed = parseFeed('<rss><item><title><![CDATA[A <b>&</b> B]]></title><description>Hi<script>evil()</script> there<style>p{}</style>!</description></item><itemx>no</itemx></rss>');
-  assert.equal(feed.items.length, 1, '<itemx> is not an <item>');
-  assert.equal(feed.items[0].title, 'A & B');
-  assert.equal(feed.items[0].summary, 'Hi there !');
+  {
+    const many = `<rss><channel>${'<item><title>x</title></item>'.repeat(500)}</channel></rss>`;
+    assert.equal(parseFeed(many).items.length, 200, 'at most 200 items');
+    const feed = parseFeed('<rss><item><title><![CDATA[A <b>&</b> B]]></title><description>Hi<script>evil()</script> there<style>p{}</style>!</description></item><itemx>no</itemx></rss>');
+    assert.equal(feed.items.length, 1, '<itemx> is not an <item>');
+    assert.equal(feed.items[0].title, 'A & B');
+    assert.equal(feed.items[0].summary, 'Hi there !');
+  }
 });
 
 test('Spotify: parallel callers share one token refresh', async () => {

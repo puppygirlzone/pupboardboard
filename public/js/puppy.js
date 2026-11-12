@@ -1,10 +1,8 @@
-// Puppy mode easter egg: pure helpers (no DOM), shared by the page and tests.
-// Turn it on by typing "woof" anywhere, or tapping the greeting 5 times.
+// Puppy mode data and small helpers shared by the easter eggs (see eggs.js).
 
 import { zonedParts } from './format.js';
 
 export const PUPPY_KEY = 'pupboard:puppy';
-export const SECRET_WORD = 'woof';
 
 // One list per time of day. A line is picked per day, so it stays put.
 export const PUPPY_GREETINGS = {
@@ -20,36 +18,6 @@ export function timeSlot(date = new Date(), timeZone = null) {
   if (h < 12) return 'morning';
   if (h < 18) return 'afternoon';
   return 'evening';
-}
-
-/** Same line all day for a given time slot; changes day to day. */
-export function puppyGreeting(date = new Date(), timeZone = null) {
-  const lines = PUPPY_GREETINGS[timeSlot(date, timeZone)];
-  const { year, month, day } = zonedParts(date, timeZone);
-  const dayNumber = Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
-  return lines[((dayNumber % lines.length) + lines.length) % lines.length];
-}
-
-/** Puppy wording for the "Updated just now" indicator. */
-export const syncVerb = (puppy) => (puppy ? 'Fetched' : 'Updated');
-
-/**
- * Feed it key presses; returns true when the secret word has just been typed.
- * Case-insensitive; any other key resets progress.
- */
-export function createSequenceDetector(word = SECRET_WORD) {
-  const target = word.toLowerCase();
-  let progress = '';
-  return function press(key) {
-    const k = String(key ?? '').toLowerCase();
-    if (k.length !== 1) return false; // Shift, Arrow keys and so on are ignored
-    progress = (progress + k).slice(-target.length);
-    if (progress === target) {
-      progress = '';
-      return true;
-    }
-    return false;
-  };
 }
 
 /** Counts quick taps; returns true on the Nth tap within the time window. */

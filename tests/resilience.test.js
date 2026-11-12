@@ -7,24 +7,24 @@ import { fakeClock, json, NO_FEEDS_FILE } from './helpers.js';
 const source = (load, opts = {}) =>
   createCachedSource({ name: 't', ttlMs: 60_000, isConfigured: () => true, load, retries: 1, retryDelayMs: 0, ...opts });
 
-test('config: missing env leaves every account-based source unconfigured', () => {
-  const c = loadConfig({ ...NO_FEEDS_FILE });
-  assert.equal(c.port, 8742);
-  for (const k of ['steam', 'navidrome', 'jellyfin']) assert.equal(isConfigured[k](c), false, k);
-  assert.equal(isConfigured.rss(c), true, 'RSS has default feeds');
-});
-
-test('config: trims values, strips trailing slashes, ignores junk numbers', () => {
-  const c = loadConfig({ NAVIDROME_URL: ' http://nd:4533/// ', NAVIDROME_USER: 'u', NAVIDROME_PASSWORD: 'p', PORT: 'abc', STEAM_CACHE_SECONDS: '-5' });
-  assert.equal(c.navidrome.url, 'http://nd:4533');
-  assert.equal(isConfigured.navidrome(c), true);
-  assert.equal(c.port, 8742);
-  assert.equal(c.steam.ttlMs, 300_000);
-});
-
-test('config: demo mode configures all sources', () => {
-  const c = loadConfig({ DEMO_MODE: 'true' });
-  for (const k of Object.keys(isConfigured)) assert.equal(isConfigured[k](c), true, k);
+test('config: missing, messy and demo settings', () => {
+  {
+    const c = loadConfig({ ...NO_FEEDS_FILE });
+    assert.equal(c.port, 8742);
+    for (const k of ['steam', 'navidrome', 'jellyfin']) assert.equal(isConfigured[k](c), false, k);
+    assert.equal(isConfigured.rss(c), true, 'RSS has default feeds');
+  }
+  {
+    const c = loadConfig({ NAVIDROME_URL: ' http://nd:4533/// ', NAVIDROME_USER: 'u', NAVIDROME_PASSWORD: 'p', PORT: 'abc', STEAM_CACHE_SECONDS: '-5' });
+    assert.equal(c.navidrome.url, 'http://nd:4533');
+    assert.equal(isConfigured.navidrome(c), true);
+    assert.equal(c.port, 8742);
+    assert.equal(c.steam.ttlMs, 300_000);
+  }
+  {
+    const c = loadConfig({ DEMO_MODE: 'true' });
+    for (const k of Object.keys(isConfigured)) assert.equal(isConfigured[k](c), true, k);
+  }
 });
 
 test('unconfigured source never calls load', async () => {
@@ -34,77 +34,75 @@ test('unconfigured source never calls load', async () => {
   assert.equal(called, false);
 });
 
-test('caches within TTL, refetches after', async () => {
-  const now = fakeClock();
-  let n = 0;
-  const s = source(async () => ({ n: ++n }), { now });
-  assert.equal((await s.get()).data.n, 1);
-  assert.equal((await s.get()).data.n, 1);
-  now.advance(61_000);
-  assert.equal((await s.get()).data.n, 2);
-});
-
-test('retries once before giving up', async () => {
-  let n = 0;
-  const s = source(async () => {
-    if (++n === 1) throw new Error('flaky');
-    return { ok: true };
-  });
-  const r = await s.get();
-  assert.equal(r.status, 'ok');
-  assert.equal(n, 2);
-});
-
-test('serves stale data when upstream dies, and recovers', async () => {
-  const now = fakeClock();
-  let fail = false;
-  const s = source(
-    async () => {
-      if (fail) throw new Error('down');
-      return { v: now() };
-    },
-    { now },
-  );
-  const first = await s.get();
-  fail = true;
-  now.advance(61_000);
-  const stale = await s.get();
-  assert.equal(stale.status, 'stale');
-  assert.deepEqual(stale.data, first.data);
-  assert.match(stale.error, /down/);
-  fail = false;
-  now.advance(31_000); // past the back-off window
-  const back = await s.get();
-  assert.equal(back.status, 'ok');
-  assert.equal(back.error, null);
-});
-
-test('error with no data ever: status error, never throws', async () => {
-  const s = source(async () => {
-    throw new Error('nope');
-  });
-  const r = await s.get();
-  assert.equal(r.status, 'error');
-  assert.equal(r.data, null);
-});
-
-test('backs off after a failure instead of hammering', async () => {
-  const now = fakeClock();
-  let calls = 0;
-  const s = source(
-    async () => {
-      calls++;
-      throw new Error('x');
-    },
-    { now },
-  );
-  await s.get();
-  await s.get();
-  await s.get();
-  assert.equal(calls, 2); // first get: 1 try + 1 retry, then cooling down
-  now.advance(31_000);
-  await s.get();
-  assert.equal(calls, 4);
+test('cached source: TTL, retry, stale data, back-off and errors', async () => {
+  {
+    const now = fakeClock();
+    let n = 0;
+    const s = source(async () => ({ n: ++n }), { now });
+    assert.equal((await s.get()).data.n, 1);
+    assert.equal((await s.get()).data.n, 1);
+    now.advance(61_000);
+    assert.equal((await s.get()).data.n, 2);
+  }
+  {
+    let n = 0;
+    const s = source(async () => {
+      if (++n === 1) throw new Error('flaky');
+      return { ok: true };
+    });
+    const r = await s.get();
+    assert.equal(r.status, 'ok');
+    assert.equal(n, 2);
+  }
+  {
+    const now = fakeClock();
+    let fail = false;
+    const s = source(
+      async () => {
+        if (fail) throw new Error('down');
+        return { v: now() };
+      },
+      { now },
+    );
+    const first = await s.get();
+    fail = true;
+    now.advance(61_000);
+    const stale = await s.get();
+    assert.equal(stale.status, 'stale');
+    assert.deepEqual(stale.data, first.data);
+    assert.match(stale.error, /down/);
+    fail = false;
+    now.advance(31_000); // past the back-off window
+    const back = await s.get();
+    assert.equal(back.status, 'ok');
+    assert.equal(back.error, null);
+  }
+  {
+    const s = source(async () => {
+      throw new Error('nope');
+    });
+    const r = await s.get();
+    assert.equal(r.status, 'error');
+    assert.equal(r.data, null);
+  }
+  {
+    const now = fakeClock();
+    let calls = 0;
+    const s = source(
+      async () => {
+        calls++;
+        throw new Error('x');
+      },
+      { now },
+    );
+    await s.get();
+    await s.get();
+    await s.get();
+    assert.equal(calls, 2); // first get: 1 try + 1 retry, then cooling down
+    now.advance(31_000);
+    await s.get();
+    assert.equal(calls, 4);
+  }
 });
 
 test('concurrent gets share one in-flight request', async () => {

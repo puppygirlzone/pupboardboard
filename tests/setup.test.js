@@ -67,36 +67,36 @@ test('settings file is written owner-only', { skip: process.platform === 'win32'
   }
 });
 
-test('environment always wins over saved settings', () => {
-  const merged = mergeSettings({ STEAM_ID: '11111111111111111', JELLYFIN_URL: '  ' }, { STEAM_ID: '22222222222222222', JELLYFIN_URL: 'http://jf' });
-  assert.equal(merged.STEAM_ID, '11111111111111111');
-  assert.equal(merged.JELLYFIN_URL, 'http://jf', 'blank env values do not count');
-});
+test('settings: environment wins, secrets never shown, validation and link clean-up', () => {
+  {
+    const merged = mergeSettings({ STEAM_ID: '11111111111111111', JELLYFIN_URL: '  ' }, { STEAM_ID: '22222222222222222', JELLYFIN_URL: 'http://jf' });
+    assert.equal(merged.STEAM_ID, '11111111111111111');
+    assert.equal(merged.JELLYFIN_URL, 'http://jf', 'blank env values do not count');
+  }
+  {
+    const fields = describeSettings({ NAVIDROME_PASSWORD: 'envpw' }, { STEAM_API_KEY: 'SECRET', STEAM_ID: '12345678901234567' });
+    const by = Object.fromEntries(fields.map((f) => [f.key, f]));
+    assert.ok(!JSON.stringify(fields).includes('SECRET') && !JSON.stringify(fields).includes('envpw'));
+    assert.equal(by.STEAM_API_KEY.isSet, true);
+    assert.equal(by.STEAM_ID.value, '12345678901234567');
+    assert.equal(by.NAVIDROME_PASSWORD.locked, true);
+    assert.equal(by.JELLYFIN_API_KEY.isSet, false);
+  }
+  {
+    const saved = { STEAM_API_KEY: 'old', JELLYFIN_API_KEY: 'jf' };
+    const ok = applyChanges(saved, {
+      values: { STEAM_API_KEY: '', STEAM_ID: ' 76561198000000000 ', NAVIDROME_URL: 'http://nd.local:4533///', TIME_ZONE: 'Europe/London', HOST: '0.0.0.0', BOGUS: 'x', JELLYFIN_URL: 'http://locked' },
+      clear: ['JELLYFIN_API_KEY', 'BOGUS'],
+    }, { JELLYFIN_URL: 'http://from-env' });
+    assert.deepEqual(ok.errors, []);
+    assert.deepEqual(ok.settings, { STEAM_API_KEY: 'old', STEAM_ID: '76561198000000000', NAVIDROME_URL: 'http://nd.local:4533', TIME_ZONE: 'Europe/London', HOST: '0.0.0.0' });
 
-test('describeSettings never reveals secrets and marks env-locked fields', () => {
-  const fields = describeSettings({ NAVIDROME_PASSWORD: 'envpw' }, { STEAM_API_KEY: 'SECRET', STEAM_ID: '12345678901234567' });
-  const by = Object.fromEntries(fields.map((f) => [f.key, f]));
-  assert.ok(!JSON.stringify(fields).includes('SECRET') && !JSON.stringify(fields).includes('envpw'));
-  assert.equal(by.STEAM_API_KEY.isSet, true);
-  assert.equal(by.STEAM_ID.value, '12345678901234567');
-  assert.equal(by.NAVIDROME_PASSWORD.locked, true);
-  assert.equal(by.JELLYFIN_API_KEY.isSet, false);
-});
-
-test('applyChanges validates, keeps blank secrets, clears on request, skips locked keys', () => {
-  const saved = { STEAM_API_KEY: 'old', JELLYFIN_API_KEY: 'jf' };
-  const ok = applyChanges(saved, {
-    values: { STEAM_API_KEY: '', STEAM_ID: ' 76561198000000000 ', NAVIDROME_URL: 'http://nd.local:4533///', TIME_ZONE: 'Europe/London', HOST: '0.0.0.0', BOGUS: 'x', JELLYFIN_URL: 'http://locked' },
-    clear: ['JELLYFIN_API_KEY', 'BOGUS'],
-  }, { JELLYFIN_URL: 'http://from-env' });
-  assert.deepEqual(ok.errors, []);
-  assert.deepEqual(ok.settings, { STEAM_API_KEY: 'old', STEAM_ID: '76561198000000000', NAVIDROME_URL: 'http://nd.local:4533', TIME_ZONE: 'Europe/London', HOST: '0.0.0.0' });
-
-  const bad = applyChanges({}, {
-    values: { STEAM_ID: 'not a profile!', NAVIDROME_URL: 'javascript:alert(1)', JELLYFIN_URL: 'http://user:pw@host', TIME_ZONE: 'Mars/Base', CLOCK_FORMAT: '13h', NAVIDROME_USER: 'a\nb', HOST: '8.8.8.8', STEAM_API_KEY: 7 },
-  });
-  assert.deepEqual(bad.errors.map((e) => e.key).sort(), ['CLOCK_FORMAT', 'HOST', 'JELLYFIN_URL', 'NAVIDROME_URL', 'NAVIDROME_USER', 'STEAM_API_KEY', 'STEAM_ID', 'TIME_ZONE']);
-  for (const junk of [null, 'x', { values: 'x' }, { values: null, clear: 'x' }]) assert.deepEqual(applyChanges({ A: 1 }, junk).errors, []);
+    const bad = applyChanges({}, {
+      values: { STEAM_ID: 'not a profile!', NAVIDROME_URL: 'javascript:alert(1)', JELLYFIN_URL: 'http://user:pw@host', TIME_ZONE: 'Mars/Base', CLOCK_FORMAT: '13h', NAVIDROME_USER: 'a\nb', HOST: '8.8.8.8', STEAM_API_KEY: 7 },
+    });
+    assert.deepEqual(bad.errors.map((e) => e.key).sort(), ['CLOCK_FORMAT', 'HOST', 'JELLYFIN_URL', 'NAVIDROME_URL', 'NAVIDROME_USER', 'STEAM_API_KEY', 'STEAM_ID', 'TIME_ZONE']);
+    for (const junk of [null, 'x', { values: 'x' }, { values: null, clear: 'x' }]) assert.deepEqual(applyChanges({ A: 1 }, junk).errors, []);
+  }
 });
 
 /* ------------------------------------------------------------ the API */

@@ -8,7 +8,8 @@ import { loadConfig, resolveSlots, isConfigured } from '../server/config.js';
 import { createFakeFetch } from '../server/demo/fake-upstreams.js';
 import { coverArtUrl, normalizeListens, normalizePlayingNow, createListenBrainzLoader, validListenBrainzUser } from '../server/sources/listenbrainz.js';
 import { createSpotifyAuth, createSpotifyLoader, pkceChallenge, normalizeCurrentlyPlaying, pickImage } from '../server/sources/spotify.js';
-import { normalizeFreebies, normalizeDeals, createDealsLoader } from '../server/sources/deals.js';
+import { normalizeFreebies, normalizeDeals, createDealsLoader, localiseSteam, normalizeEpicFree, normalizeGog, mergeFreebies, validCurrency } from '../server/sources/deals.js';
+import { formatMoney } from '../public/js/format.js';
 import { parseDiary, diaryStats, createLetterboxdLoader, validLetterboxdUser } from '../server/sources/letterboxd.js';
 import { parseSteamProfile, createSteamLoader } from '../server/sources/steam.js';
 import { safeImage } from '../server/sources/common.js';
@@ -30,24 +31,25 @@ test('safeImage: https only (plus demo art in demo mode)', () => {
 
 /* ------------------------------------------------------------ slots */
 
-test('card slots: chosen source wins, auto picks the first one set up', () => {
-  const env = { ...NO_FEEDS_FILE };
-  assert.deepEqual(resolveSlots(loadConfig(env)), { music: 'listenbrainz', media: 'deals' });
-  assert.deepEqual(resolveSlots(loadConfig({ ...env, LISTENBRAINZ_USER: 'me', LETTERBOXD_USER: 'me' })), { music: 'listenbrainz', media: 'letterboxd' });
-  assert.deepEqual(resolveSlots(loadConfig({ ...env, LISTENBRAINZ_USER: 'me', NAVIDROME_URL: 'http://n', NAVIDROME_USER: 'u', NAVIDROME_PASSWORD: 'p' })).music, 'navidrome');
-  assert.deepEqual(resolveSlots(loadConfig({ ...env, MUSIC_SOURCE: 'SPOTIFY', MEDIA_SOURCE: 'jellyfin' })), { music: 'spotify', media: 'jellyfin' }, 'chosen even when not set up, so the card explains how');
-  assert.deepEqual(resolveSlots(loadConfig({ ...env, MUSIC_SOURCE: 'bogus', DEALS: 'off' })).media, 'deals', 'unknown choice = auto; deals card says how to turn it back on');
-  assert.equal(isConfigured.spotify(loadConfig({ ...env, SPOTIFY_CLIENT_ID: 'a'.repeat(32) })), false, 'a Client ID alone is not connected');
-});
-
-test('views: slotsOf falls back for old saved copies; overview shows the chosen cards', () => {
-  assert.deepEqual(slotsOf(null), { music: 'navidrome', media: 'jellyfin' });
-  assert.deepEqual(slotsOf({ slots: { music: '<x>', media: 'deals' } }), { music: 'navidrome', media: 'deals' });
-  const html = overview({ slots: { music: 'spotify', media: 'letterboxd' }, spotify: { status: 'unconfigured' }, letterboxd: { status: 'unconfigured' } }, NOW);
-  assert.match(html, /data-source="spotify"/);
-  assert.match(html, /data-source="letterboxd"/);
-  assert.match(html, /Connect Spotify/);
-  assert.ok(!/data-source="navidrome"|data-source="jellyfin"/.test(html));
+test('card slots: chosen source wins, auto picks the first set up; views fall back for old saved copies', () => {
+  {
+    const env = { ...NO_FEEDS_FILE };
+    assert.deepEqual(resolveSlots(loadConfig(env)), { music: 'listenbrainz', media: 'deals' });
+    assert.deepEqual(resolveSlots(loadConfig({ ...env, LISTENBRAINZ_USER: 'me', LETTERBOXD_USER: 'me' })), { music: 'listenbrainz', media: 'letterboxd' });
+    assert.deepEqual(resolveSlots(loadConfig({ ...env, LISTENBRAINZ_USER: 'me', NAVIDROME_URL: 'http://n', NAVIDROME_USER: 'u', NAVIDROME_PASSWORD: 'p' })).music, 'navidrome');
+    assert.deepEqual(resolveSlots(loadConfig({ ...env, MUSIC_SOURCE: 'SPOTIFY', MEDIA_SOURCE: 'jellyfin' })), { music: 'spotify', media: 'jellyfin' }, 'chosen even when not set up, so the card explains how');
+    assert.deepEqual(resolveSlots(loadConfig({ ...env, MUSIC_SOURCE: 'bogus', DEALS: 'off' })).media, 'deals', 'unknown choice = auto; deals card says how to turn it back on');
+    assert.equal(isConfigured.spotify(loadConfig({ ...env, SPOTIFY_CLIENT_ID: 'a'.repeat(32) })), false, 'a Client ID alone is not connected');
+  }
+  {
+    assert.deepEqual(slotsOf(null), { music: 'navidrome', media: 'jellyfin' });
+    assert.deepEqual(slotsOf({ slots: { music: '<x>', media: 'deals' } }), { music: 'navidrome', media: 'deals' });
+    const html = overview({ slots: { music: 'spotify', media: 'letterboxd' }, spotify: { status: 'unconfigured' }, letterboxd: { status: 'unconfigured' } }, NOW);
+    assert.match(html, /data-source="spotify"/);
+    assert.match(html, /data-source="letterboxd"/);
+    assert.match(html, /Connect Spotify/);
+    assert.ok(!/data-source="navidrome"|data-source="jellyfin"/.test(html));
+  }
 });
 
 test('every new card and page renders in every no-data state', () => {
@@ -65,74 +67,77 @@ test('every new card and page renders in every no-data state', () => {
   }
 });
 
-test('views: hostile names are escaped and unsafe links dropped on the new cards', () => {
-  const bad = '<img src=x onerror=alert(1)>';
-  const env = (data) => ({ status: 'ok', updatedAt: new Date(NOW).toISOString(), data });
-  const music = musicGlance('spotify', env({ nowPlaying: [{ title: bad, artist: bad, album: bad, art: null }], recentlyPlayed: [{ title: bad, artist: bad, album: bad, playDate: new Date(NOW).toISOString() }], stats: { tracksThisWeek: 1, minutesThisWeek: 3, topArtists: [{ name: bad, plays: 1 }], exact: true }, hasSongHistory: true }), NOW);
-  const deals = dealsGlance(env({ freebies: [{ title: bad, store: bad, url: null, image: null, worth: 5 }], deals: [], hasFreebies: true, hasDeals: true, freeWorth: 5, bestSaving: 0 }), NOW);
-  const films = letterboxdGlance(env({ films: [{ title: bad, poster: null, rating: 4 }], stats: { thisWeek: 1, thisMonth: 1 } }), NOW);
-  for (const html of [music, deals, films]) assert.ok(!html.includes('<img src=x'), html.slice(0, 80));
-  assert.equal(stars(3.5), '★★★½');
-  assert.equal(stars(null), '');
-});
-
-test('views: unknown numbers show "—", never a misleading 0; capped counts show "+"', () => {
-  const env = (data) => ({ status: 'ok', updatedAt: new Date(NOW).toISOString(), data });
-  const deals = dealsGlance(env({ freebies: [], deals: [], hasFreebies: false, hasDeals: false, freeWorth: 0, bestSaving: 0 }), NOW);
-  assert.ok(!/data-count="0"/.test(deals), 'failed deal calls do not show 0');
-  const lb = musicGlance('listenbrainz', env({ nowPlaying: [], recentlyPlayed: [], stats: { tracksThisWeek: 5, minutesThisWeek: 1, minutesKnown: false, exact: true }, hasSongHistory: true }), NOW);
-  assert.match(lb, /track lengths unknown/);
-  const sp = musicGlance('spotify', env({ nowPlaying: [], recentlyPlayed: [], stats: { tracksThisWeek: 50, minutesThisWeek: 150, capped: true, exact: true }, hasSongHistory: true }), NOW);
-  assert.match(sp, />50\+</);
+test('views: hostile names escaped, unsafe links dropped, unknown numbers never a misleading 0', () => {
+  {
+    const bad = '<img src=x onerror=alert(1)>';
+    const env = (data) => ({ status: 'ok', updatedAt: new Date(NOW).toISOString(), data });
+    const music = musicGlance('spotify', env({ nowPlaying: [{ title: bad, artist: bad, album: bad, art: null }], recentlyPlayed: [{ title: bad, artist: bad, album: bad, playDate: new Date(NOW).toISOString() }], stats: { tracksThisWeek: 1, minutesThisWeek: 3, topArtists: [{ name: bad, plays: 1 }], exact: true }, hasSongHistory: true }), NOW);
+    const deals = dealsGlance(env({ freebies: [{ title: bad, store: bad, url: null, image: null, worth: 5 }], deals: [], hasFreebies: true, hasDeals: true, freeWorth: 5, bestSaving: 0 }), NOW);
+    const films = letterboxdGlance(env({ films: [{ title: bad, poster: null, rating: 4 }], stats: { thisWeek: 1, thisMonth: 1 } }), NOW);
+    for (const html of [music, deals, films]) assert.ok(!html.includes('<img src=x'), html.slice(0, 80));
+    assert.equal(stars(3.5), '★★★½');
+    assert.equal(stars(null), '');
+  }
+  {
+    const env = (data) => ({ status: 'ok', updatedAt: new Date(NOW).toISOString(), data });
+    const deals = dealsGlance(env({ freebies: [], deals: [], hasFreebies: false, hasDeals: false, freeWorth: 0, bestSaving: 0 }), NOW);
+    assert.ok(!/data-count="0"/.test(deals), 'failed deal calls do not show 0');
+    const lb = musicGlance('listenbrainz', env({ nowPlaying: [], recentlyPlayed: [], stats: { tracksThisWeek: 5, minutesThisWeek: 1, minutesKnown: false, exact: true }, hasSongHistory: true }), NOW);
+    assert.match(lb, /track lengths unknown/);
+    const sp = musicGlance('spotify', env({ nowPlaying: [], recentlyPlayed: [], stats: { tracksThisWeek: 50, minutesThisWeek: 150, capped: true, exact: true }, hasSongHistory: true }), NOW);
+    assert.match(sp, />50\+</);
+  }
 });
 
 /* ------------------------------------------------------------ ListenBrainz */
 
-test('ListenBrainz: parsing, cover art validation, junk', () => {
-  assert.equal(coverArtUrl({ mbid_mapping: { caa_release_mbid: '0d4a1d0a-1111-2222-3333-444455556666', caa_id: 123 } }), 'https://coverartarchive.org/release/0d4a1d0a-1111-2222-3333-444455556666/123-250.jpg');
-  assert.equal(coverArtUrl({ mbid_mapping: { caa_release_mbid: '../../evil', caa_id: 1 } }), null);
-  assert.equal(coverArtUrl({}), null);
-  assert.throws(() => normalizeListens({ nope: 1 }));
-  const listens = normalizeListens({ payload: { listens: [{ listened_at: NOW / 1000, track_metadata: { track_name: 'A', artist_name: 'B', additional_info: { duration_ms: 180000 } } }, { listened_at: 'junk' }, null] } });
-  assert.equal(listens.length, 1);
-  assert.equal(listens[0].duration, 180);
-  assert.deepEqual(normalizePlayingNow({ payload: { listens: [] } }), []);
-  assert.equal(validListenBrainzUser('rob'), true);
-  assert.equal(validListenBrainzUser('a/b'), false);
-  assert.equal(validListenBrainzUser(''), false);
-});
+test('ListenBrainz: parsing, cover art, partial failures, unknown user', async () => {
+  {
+    assert.equal(coverArtUrl({ mbid_mapping: { caa_release_mbid: '0d4a1d0a-1111-2222-3333-444455556666', caa_id: 123 } }), 'https://coverartarchive.org/release/0d4a1d0a-1111-2222-3333-444455556666/123-250.jpg');
+    assert.equal(coverArtUrl({ mbid_mapping: { caa_release_mbid: '../../evil', caa_id: 1 } }), null);
+    assert.equal(coverArtUrl({}), null);
+    assert.throws(() => normalizeListens({ nope: 1 }));
+    const listens = normalizeListens({ payload: { listens: [{ listened_at: NOW / 1000, track_metadata: { track_name: 'A', artist_name: 'B', additional_info: { duration_ms: 180000 } } }, { listened_at: 'junk' }, null] } });
+    assert.equal(listens.length, 1);
+    assert.equal(listens[0].duration, 180);
+    assert.deepEqual(normalizePlayingNow({ payload: { listens: [] } }), []);
+    assert.equal(validListenBrainzUser('rob'), true);
+    assert.equal(validListenBrainzUser('a/b'), false);
+    assert.equal(validListenBrainzUser(''), false);
+  }
+  {
+    const listens = { payload: { listens: [{ listened_at: NOW / 1000 - 3600, track_metadata: { track_name: 'Song', artist_name: 'Band', release_name: 'LP' } }] } };
+    const fetchImpl = stubFetch([
+      [(u) => u.includes('/playing-now'), () => new Response('boom', { status: 500 })],
+      [(u) => u.includes('/stats/'), () => new Response(null, { status: 204 })],
+      [(u) => u.includes('/listens'), () => json(listens)],
+    ]);
+    const load = createListenBrainzLoader({ config: cfg({ listenbrainz: { user: 'me & you' } }), fetchImpl, now: () => NOW });
+    const d = await load();
+    assert.equal(d.stats.tracksThisWeek, 1);
+    assert.equal(d.stats.minutesKnown, false, 'no track lengths: minutes are unknown, not 0');
+    assert.deepEqual(d.topSongs, [], '204 from stats = nothing computed yet');
+    assert.equal(d.warnings.length, 1);
+    assert.match(fetchImpl.calls[0].url, /\/user\/me%20%26%20you\//, 'username is URL-encoded');
 
-test('ListenBrainz loader: partial failure keeps the rest; empty stats; unknown user', async () => {
-  const listens = { payload: { listens: [{ listened_at: NOW / 1000 - 3600, track_metadata: { track_name: 'Song', artist_name: 'Band', release_name: 'LP' } }] } };
-  const fetchImpl = stubFetch([
-    [(u) => u.includes('/playing-now'), () => new Response('boom', { status: 500 })],
-    [(u) => u.includes('/stats/'), () => new Response(null, { status: 204 })],
-    [(u) => u.includes('/listens'), () => json(listens)],
-  ]);
-  const load = createListenBrainzLoader({ config: cfg({ listenbrainz: { user: 'me & you' } }), fetchImpl, now: () => NOW });
-  const d = await load();
-  assert.equal(d.stats.tracksThisWeek, 1);
-  assert.equal(d.stats.minutesKnown, false, 'no track lengths: minutes are unknown, not 0');
-  assert.deepEqual(d.topSongs, [], '204 from stats = nothing computed yet');
-  assert.equal(d.warnings.length, 1);
-  assert.match(fetchImpl.calls[0].url, /\/user\/me%20%26%20you\//, 'username is URL-encoded');
-
-  const missing = createListenBrainzLoader({ config: cfg({ listenbrainz: { user: 'ghost' } }), fetchImpl: stubFetch([[() => true, () => new Response('', { status: 404 })]]) });
-  await assert.rejects(missing(), /not found/);
+    const missing = createListenBrainzLoader({ config: cfg({ listenbrainz: { user: 'ghost' } }), fetchImpl: stubFetch([[() => true, () => new Response('', { status: 404 })]]) });
+    await assert.rejects(missing(), /not found/);
+  }
 });
 
 /* ------------------------------------------------------------ Spotify */
 
-test('Spotify: PKCE challenge matches the RFC 7636 example', () => {
-  assert.equal(pkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'), 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
-});
-
-test('Spotify: picking images and parsing now-playing', () => {
-  assert.equal(pickImage([{ url: 'https://a/640', width: 640 }, { url: 'https://a/300', width: 300 }, { url: 'https://a/64', width: 64 }]), 'https://a/300');
-  assert.equal(pickImage([{ url: 'http://insecure', width: 300 }]), null);
-  assert.deepEqual(normalizeCurrentlyPlaying(null), []);
-  assert.deepEqual(normalizeCurrentlyPlaying({ is_playing: true, currently_playing_type: 'episode', item: {} }), []);
-  assert.equal(normalizeCurrentlyPlaying({ is_playing: true, currently_playing_type: 'track', item: { name: 'X', artists: [{ name: 'A' }, { name: 'B' }] } })[0].artist, 'A, B');
+test('Spotify: PKCE challenge, images and now-playing parsing', () => {
+  {
+    assert.equal(pkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'), 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
+  }
+  {
+    assert.equal(pickImage([{ url: 'https://a/640', width: 640 }, { url: 'https://a/300', width: 300 }, { url: 'https://a/64', width: 64 }]), 'https://a/300');
+    assert.equal(pickImage([{ url: 'http://insecure', width: 300 }]), null);
+    assert.deepEqual(normalizeCurrentlyPlaying(null), []);
+    assert.deepEqual(normalizeCurrentlyPlaying({ is_playing: true, currently_playing_type: 'episode', item: {} }), []);
+    assert.equal(normalizeCurrentlyPlaying({ is_playing: true, currently_playing_type: 'track', item: { name: 'X', artists: [{ name: 'A' }, { name: 'B' }] } })[0].artist, 'A, B');
+  }
 });
 
 const CLIENT = 'a'.repeat(32);
@@ -258,33 +263,83 @@ test('Spotify routes: sign-in needs the setup code, callback checks state and is
 
 /* ------------------------------------------------------------ Deals */
 
-test('deals: parsing, junk, unsafe links and pictures dropped', () => {
+test('deals: junk and unsafe values dropped; Epic, GOG and Steam local prices; money formatting', () => {
+  // GamerPower
   assert.deepEqual(normalizeFreebies({ status: 0, status_message: 'No active giveaways' }), []);
   assert.throws(() => normalizeFreebies('junk'));
   const [g] = normalizeFreebies([{ id: 1, title: 'Cool Game (Epic Games) Giveaway', worth: '$19.99', thumbnail: 'http://insecure/x.jpg', image: 'https://ok/y.jpg', open_giveaway_url: 'javascript:alert(1)', gamerpower_url: 'https://gp/1', platforms: 'PC, Epic Games Store', end_date: 'N/A', status: 'Active' }, { title: 'Old', status: 'Expired' }]);
-  assert.equal(g.title, 'Cool Game');
-  assert.equal(g.store, 'Epic Games Store');
-  assert.equal(g.worth, 19.99);
-  assert.equal(g.image, 'https://ok/y.jpg');
-  assert.equal(g.url, 'https://gp/1');
-  assert.equal(g.endsAt, null);
+  assert.deepEqual([g.title, g.store, g.worth, g.worthCurrency, g.image, g.url, g.endsAt], ['Cool Game', 'Epic Games Store', 19.99, 'USD', 'https://ok/y.jpg', 'https://gp/1', null]);
+
+  // CheapShark: duplicates and 0% deals dropped, CheapShark's redirect link kept
   assert.throws(() => normalizeDeals({}));
   const deals = normalizeDeals([{ title: 'A', dealID: 'x/y', salePrice: '1.00', normalPrice: '10.00', savings: '90.0', steamAppID: '123' }, { title: 'A', dealID: 'dup', savings: '50' }, { title: 'B', dealID: 'z', savings: '0' }]);
-  assert.equal(deals.length, 1, 'duplicates and 0% deals dropped');
+  assert.equal(deals.length, 1);
   assert.equal(deals[0].url, 'https://www.cheapshark.com/redirect?dealID=x%2Fy');
-  assert.match(deals[0].image, /steamstatic\.com\/steam\/apps\/123\//);
+
+  // Steam local prices: discounted here -> local price; not discounted / not sold here -> dropped; unknown -> US price kept
+  const usd = (appid) => ({ appid, title: appid ?? 'no id', price: 5, normalPrice: 10, savings: 50, currency: 'USD' });
+  const local = localiseSteam([usd('1'), usd('2'), usd('3'), usd(null), usd('4')], {
+    1: { success: true, data: { price_overview: { currency: 'AUD', initial: 1500, final: 750, discount_percent: 50 } } },
+    2: { success: true, data: { price_overview: { currency: 'AUD', initial: 1500, final: 1500, discount_percent: 0 } } },
+    3: { success: false },
+  }, 'AUD');
+  assert.deepEqual(local.map((d) => [d.title, d.price, d.normalPrice, d.currency]), [['1', 7.5, 15, 'AUD'], ['no id', 5, 10, 'USD'], ['4', 5, 10, 'USD']]);
+
+  // Epic: only games free right now, with their local price
+  const offer = (from, to) => ({ promotionalOffers: [{ promotionalOffers: [{ startDate: new Date(NOW + from).toISOString(), endDate: new Date(NOW + to).toISOString() }] }] });
+  const epic = normalizeEpicFree({ data: { Catalog: { searchStore: { elements: [
+    { id: 'x', title: 'Free One', productSlug: 'free-one', keyImages: [{ type: 'OfferImageWide', url: 'https://img/x.jpg' }], price: { totalPrice: { discountPrice: 0, originalPrice: 3595, currencyCode: 'AUD', currencyInfo: { decimals: 2 } } }, promotions: offer(-1e6, 1e6) },
+    { title: 'On sale, not free', price: { totalPrice: { discountPrice: 500, originalPrice: 1000 } }, promotions: offer(-1e6, 1e6) },
+    { title: 'Was free', price: { totalPrice: { discountPrice: 0, originalPrice: 1000 } }, promotions: offer(-2e6, -1e6) },
+    { title: 'Bad slug', productSlug: '../x', price: { totalPrice: { discountPrice: 0, originalPrice: 100, currencyCode: 'AUD' } }, promotions: offer(-1e6, 1e6) },
+  ] } } } }, {}, NOW);
+  assert.deepEqual(epic.map((x) => [x.title, x.worth, x.worthCurrency, x.url]), [['Free One', 35.95, 'AUD', 'https://store.epicgames.com/p/free-one'], ['Bad slug', 1, 'AUD', 'https://store.epicgames.com/free-games']]);
+  assert.throws(() => normalizeEpicFree({}));
+
+  // GOG: native currency; full-price games dropped; unsafe picture and link replaced
+  const gog = normalizeGog({ products: [
+    { id: 1, title: 'G', price: { discount: '-50%', finalMoney: { amount: '7.49', currency: 'GBP' }, baseMoney: { amount: '14.99', currency: 'GBP' } }, coverHorizontal: 'http://insecure', storeLink: 'javascript:x', reviewsRating: 45 },
+    { id: 2, title: 'Full price', price: { discount: '0%', finalMoney: { amount: '5', currency: 'GBP' }, baseMoney: { amount: '5', currency: 'GBP' } } },
+  ] });
+  assert.deepEqual(gog.map((x) => [x.title, x.price, x.currency, x.savings, x.image, x.rating, x.store]), [['G', 7.49, 'GBP', 50, null, 90, 'GOG']]);
+  assert.match(gog[0].url, /^https:\/\/www\.gog\.com\//);
+  assert.throws(() => normalizeGog([]));
+
+  // Free games: Epic's own list wins; others converted (≈) only when there's a rate
+  const merged = mergeFreebies({ epic: [{ title: 'Free One', store: 'Epic Games Store', worth: 35.95, worthCurrency: 'AUD' }], gamerpower: [{ title: 'free one', store: 'Epic Games Store', worth: 24.99, worthCurrency: 'USD' }, { title: 'Other', store: 'GOG', worth: 10, worthCurrency: 'USD' }], currency: 'AUD', rate: 1.5 });
+  assert.deepEqual(merged.map((x) => [x.title, x.worth, x.worthCurrency, Boolean(x.worthApprox)]), [['Free One', 35.95, 'AUD', false], ['Other', 15, 'AUD', true]]);
+  assert.equal(mergeFreebies({ gamerpower: [{ title: 'Other', store: 'GOG', worth: 10, worthCurrency: 'USD' }], currency: 'AUD', rate: null })[0].worthCurrency, 'USD', 'no rate: stays in US dollars');
+
+  // Money formatting
+  assert.equal(formatMoney(7.5, 'AUD'), 'A$7.50');
+  assert.equal(formatMoney(3, 'GBP'), '£3.00');
+  assert.equal(formatMoney(5, 'USD'), '$5.00');
+  assert.equal(formatMoney(5, 'USD', { shown: 'AUD' }), 'US$5.00', 'a fallback US price is labelled');
+  assert.equal(formatMoney(15, 'AUD', { approx: true }), '≈A$15.00');
+  assert.equal(formatMoney(null), '');
+  assert.deepEqual(['gbp', 'AUD', 'EUR', undefined].map(validCurrency), ['GBP', 'AUD', 'USD', 'USD']);
 });
 
-test('deals loader: one site down still shows the other, flagged so it is not a 0', async () => {
+test('deals loader: local currency end to end; failures flagged (never a fake 0), US prices labelled when Steam is down', async () => {
+  const demo = await createDealsLoader({ config: { timeoutMs: 300, demo: true, deals: { currency: 'AUD' } }, fetchImpl: createFakeFetch({ failureRate: 0, latencyMs: [0, 0] }) })();
+  assert.equal(demo.currency, 'AUD');
+  assert.ok(demo.deals.length && demo.deals.every((d) => d.currency === 'AUD'), 'Steam sales in A$');
+  assert.ok(demo.gog.length && demo.gog.every((d) => d.currency === 'AUD'), 'GOG sales in A$');
+  assert.deepEqual(demo.freebies.map((f) => [f.worthCurrency, Boolean(f.worthApprox)]), [['AUD', false], ['AUD', true], ['AUD', true]], 'Epic exact, others ≈');
+  assert.ok(demo.warnings.length === 0);
+
   const fetchImpl = stubFetch([
-    [(u) => u.includes('gamerpower'), () => new Response('', { status: 503 })],
-    [(u) => u.includes('cheapshark'), () => json([{ title: 'A', dealID: '1', salePrice: '5', normalPrice: '10', savings: '50' }])],
+    [(u) => u.includes('gamerpower') || u.includes('epicgames'), () => new Response('', { status: 503 })],
+    [(u) => u.includes('cheapshark'), () => json([{ title: 'A', dealID: '1', salePrice: '5', normalPrice: '10', savings: '50', steamAppID: '7' }])],
+    [(u) => u.includes('appdetails'), () => new Response('', { status: 500 })],
+    [(u) => u.includes('frankfurter'), () => json({ rates: { AUD: 1.5 } })],
+    [(u) => u.includes('gog'), () => json({ products: [] })],
   ]);
-  const d = await createDealsLoader({ config: cfg(), fetchImpl })();
-  assert.equal(d.hasFreebies, false);
-  assert.equal(d.hasDeals, true);
-  assert.equal(d.bestSaving, 50);
-  assert.equal(d.warnings.length, 1);
+  const d = await createDealsLoader({ config: { timeoutMs: 200, deals: { currency: 'AUD' } }, fetchImpl })();
+  assert.equal(d.hasFreebies, false, 'free-game calls failed: "—", not 0');
+  assert.equal(d.hasGog, true);
+  assert.deepEqual(d.deals.map((x) => [x.price, x.currency]), [[5, 'USD']], 'Steam down: US price kept');
+  assert.ok(d.warnings.some((w) => /steam prices/.test(w)), 'and said so');
 });
 
 /* ------------------------------------------------------------ Letterboxd */
@@ -295,53 +350,55 @@ const DIARY = `<?xml version="1.0"?><rss version="2.0"><channel><title>x</title>
 <item><title>A list I made</title><link>https://letterboxd.com/me/list/x/</link></item>
 </channel></rss>`;
 
-test('Letterboxd: diary parsing skips lists and drops unsafe links and values', () => {
-  const films = parseDiary(DIARY);
-  assert.equal(films.length, 2);
-  assert.deepEqual(films[0], { title: 'Film & Co', year: 2026, rating: 4.5, watchedDate: '2026-11-10', rewatch: true, liked: true, poster: 'https://a.ltrbxd.com/poster.jpg', link: 'https://letterboxd.com/me/film/film/' });
-  assert.equal(films[1].link, null);
-  assert.equal(films[1].poster, null);
-  assert.equal(films[1].rating, null);
-  assert.equal(films[1].watchedDate, null);
-  assert.throws(() => parseDiary('<html>nope</html>'));
-  const stats = diaryStats(films, NOW);
-  assert.equal(stats.thisWeek, 1);
-  assert.equal(stats.averageRating, 4.5);
-  assert.equal(validLetterboxdUser('dave'), true);
-  assert.equal(validLetterboxdUser('../x'), false);
-});
-
-test('Letterboxd loader: unknown user is a clear error', async () => {
-  const load = createLetterboxdLoader({ config: cfg({ letterboxd: { user: 'ghost' } }), fetchImpl: stubFetch([[() => true, () => new Response('', { status: 404 })]]) });
-  await assert.rejects(load(), /not found/);
+test('Letterboxd: diary parsing, stats, unknown user', async () => {
+  {
+    const films = parseDiary(DIARY);
+    assert.equal(films.length, 2);
+    assert.deepEqual(films[0], { title: 'Film & Co', year: 2026, rating: 4.5, watchedDate: '2026-11-10', rewatch: true, liked: true, poster: 'https://a.ltrbxd.com/poster.jpg', link: 'https://letterboxd.com/me/film/film/' });
+    assert.equal(films[1].link, null);
+    assert.equal(films[1].poster, null);
+    assert.equal(films[1].rating, null);
+    assert.equal(films[1].watchedDate, null);
+    assert.throws(() => parseDiary('<html>nope</html>'));
+    const stats = diaryStats(films, NOW);
+    assert.equal(stats.thisWeek, 1);
+    assert.equal(stats.averageRating, 4.5);
+    assert.equal(validLetterboxdUser('dave'), true);
+    assert.equal(validLetterboxdUser('../x'), false);
+  }
+  {
+    const load = createLetterboxdLoader({ config: cfg({ letterboxd: { user: 'ghost' } }), fetchImpl: stubFetch([[() => true, () => new Response('', { status: 404 })]]) });
+    await assert.rejects(load(), /not found/);
+  }
 });
 
 /* ------------------------------------------------------------ Steam links */
 
-test('Steam: profile links, IDs and custom names are all accepted', () => {
-  assert.deepEqual(parseSteamProfile('76561198000000000'), { id: '76561198000000000' });
-  assert.deepEqual(parseSteamProfile('https://steamcommunity.com/profiles/76561198000000000/'), { id: '76561198000000000' });
-  assert.deepEqual(parseSteamProfile('steamcommunity.com/id/Pup_Name/?l=en'), { vanity: 'Pup_Name' });
-  assert.deepEqual(parseSteamProfile('pupname'), { vanity: 'pupname' });
-  for (const bad of ['', 'https://evil.example/id/x', 'steamcommunity.com/profiles/123', 'a', 'two words']) assert.equal(parseSteamProfile(bad), null, bad);
-});
+test('Steam: profile links, IDs and custom names (looked up once)', async () => {
+  {
+    assert.deepEqual(parseSteamProfile('76561198000000000'), { id: '76561198000000000' });
+    assert.deepEqual(parseSteamProfile('https://steamcommunity.com/profiles/76561198000000000/'), { id: '76561198000000000' });
+    assert.deepEqual(parseSteamProfile('steamcommunity.com/id/Pup_Name/?l=en'), { vanity: 'Pup_Name' });
+    assert.deepEqual(parseSteamProfile('pupname'), { vanity: 'pupname' });
+    for (const bad of ['', 'https://evil.example/id/x', 'steamcommunity.com/profiles/123', 'a', 'two words']) assert.equal(parseSteamProfile(bad), null, bad);
+  }
+  {
+    let lookups = 0;
+    const fetchImpl = stubFetch([
+      [(u) => u.includes('ResolveVanityURL'), () => (lookups++, json({ response: { success: 1, steamid: '76561198000000009' } }))],
+      [(u) => u.includes('GetRecentlyPlayedGames'), () => json({ response: { games: [{ appid: 1, name: 'G', playtime_2weeks: 60, playtime_forever: 600 }] } })],
+      [() => true, () => new Response('', { status: 500 })],
+    ]);
+    const history = { record: async () => [] };
+    const load = createSteamLoader({ config: cfg({ steam: { apiKey: 'K', steamId: 'https://steamcommunity.com/id/pupname' } }), fetchImpl, history, now: () => NOW });
+    await load();
+    await load();
+    assert.equal(lookups, 1);
+    assert.ok(fetchImpl.calls.some((c) => c.url.includes('steamid=76561198000000009')));
 
-test('Steam loader: a custom profile name is looked up once, then reused', async () => {
-  let lookups = 0;
-  const fetchImpl = stubFetch([
-    [(u) => u.includes('ResolveVanityURL'), () => (lookups++, json({ response: { success: 1, steamid: '76561198000000009' } }))],
-    [(u) => u.includes('GetRecentlyPlayedGames'), () => json({ response: { games: [{ appid: 1, name: 'G', playtime_2weeks: 60, playtime_forever: 600 }] } })],
-    [() => true, () => new Response('', { status: 500 })],
-  ]);
-  const history = { record: async () => [] };
-  const load = createSteamLoader({ config: cfg({ steam: { apiKey: 'K', steamId: 'https://steamcommunity.com/id/pupname' } }), fetchImpl, history, now: () => NOW });
-  await load();
-  await load();
-  assert.equal(lookups, 1);
-  assert.ok(fetchImpl.calls.some((c) => c.url.includes('steamid=76561198000000009')));
-
-  const unknown = createSteamLoader({ config: cfg({ steam: { apiKey: 'K', steamId: 'nobody' } }), fetchImpl: stubFetch([[() => true, () => json({ response: { success: 42 } })]]), history });
-  await assert.rejects(unknown(), /No Steam profile called "nobody"/);
+    const unknown = createSteamLoader({ config: cfg({ steam: { apiKey: 'K', steamId: 'nobody' } }), fetchImpl: stubFetch([[() => true, () => json({ response: { success: 42 } })]]), history });
+    await assert.rejects(unknown(), /No Steam profile called "nobody"/);
+  }
 });
 
 /* ------------------------------------------------------------ settings */

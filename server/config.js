@@ -81,6 +81,8 @@ export function loadConfig(env = process.env) {
     deals: {
       enabled: !/^(0|off|false|no)$/i.test(str(env.DEALS)),
       ttlMs: positive(env.DEALS_CACHE_SECONDS, 1800) * 1000,
+      // Prices in US dollars, Australian dollars or pounds.
+      currency: ['USD', 'AUD', 'GBP'].includes(str(env.DEALS_CURRENCY).toUpperCase()) ? str(env.DEALS_CURRENCY).toUpperCase() : 'USD',
     },
     // Which source fills the Music and Media cards ("auto" = first one set up).
     slots: {

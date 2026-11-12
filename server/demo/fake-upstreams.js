@@ -252,6 +252,33 @@ function route(url, now) {
     }).join('');
     return new Response(`<?xml version="1.0"?><rss version="2.0" xmlns:letterboxd="https://letterboxd.com"><channel><title>Letterboxd - Demo</title>${items}</channel></rss>`, { headers: { 'content-type': 'application/rss+xml' } });
   }
+  // Local prices: invented games, made-up exchange rates.
+  const demoRate = { USD: 1, AUD: 1.52, GBP: 0.79 };
+  const demoCur = (cc) => ({ US: 'USD', AU: 'AUD', GB: 'GBP', us: 'USD', au: 'AUD', gb: 'GBP' })[cc] ?? 'USD';
+  const pic = (seed, w, h) => (typeof art === 'function' ? art(seed, w, h) : '');
+  const cents = (usd, cur) => Math.round(usd * demoRate[cur] * 100);
+  if (u.host === 'api.frankfurter.dev') return json({ amount: 1, base: 'USD', date: new Date(now).toISOString().slice(0, 10), rates: { AUD: demoRate.AUD, GBP: demoRate.GBP } });
+  if (u.host === 'store.steampowered.com' && p === '/api/appdetails') {
+    const cur = demoCur(u.searchParams.get('cc'));
+    const out = {};
+    for (const id of (u.searchParams.get('appids') ?? '').split(',')) {
+      const i = Number(id) - 9900010;
+      const normal = [19.99, 29.99, 12.99, 39.99, 24.99][i];
+      const off = [75, 70, 80, 0, 50][i]; // the fourth isn't on sale in this region
+      out[id] = normal ? { success: true, data: { price_overview: { currency: cur, initial: cents(normal, cur), final: Math.round(cents(normal, cur) * (1 - off / 100)), discount_percent: off } } } : { success: false };
+    }
+    return json(out);
+  }
+  if (u.host === 'catalog.gog.com') {
+    const cur = u.searchParams.get('currencyCode') ?? 'USD';
+    const games = [['Lanternfall', 19.99, 60, 46], ['Tiny Lighthouse', 9.99, 50, 44], ['Copper Keep Deluxe', 29.99, 35, 41]];
+    return json({ productCount: games.length, products: games.map(([title, normal, off, rating], i) => ({ id: 1700 + i, title, coverHorizontal: pic(`gog-${i}`, 460, 215), storeLink: `https://example.com/gog/${i}`, reviewsRating: rating, price: { discount: `-${off}%`, finalMoney: { amount: (cents(normal, cur) * (1 - off / 100) / 100).toFixed(2), currency: cur }, baseMoney: { amount: (cents(normal, cur) / 100).toFixed(2), currency: cur } } })) });
+  }
+  if (u.host === 'store-site-backend-static.ak.epicgames.com') {
+    const cur = demoCur(u.searchParams.get('country'));
+    const offer = { startDate: new Date(now - 2 * DAY).toISOString(), endDate: new Date(now + 5 * DAY).toISOString() };
+    return json({ data: { Catalog: { searchStore: { elements: [{ id: 'demo-epic-1', title: 'Starlit Orchard', productSlug: 'starlit-orchard', keyImages: [{ type: 'OfferImageWide', url: pic('free-0', 460, 215) }], price: { totalPrice: { discountPrice: 0, originalPrice: cents(24.99, cur), currencyCode: cur, currencyInfo: { decimals: 2 } } }, promotions: { promotionalOffers: [{ promotionalOffers: [offer] }] } }] } } } });
+  }
   if (u.host === 'feeds.demo') {
     const xml = (body) => new Response(body, { headers: { 'content-type': 'application/xml' } });
     const ago = (h) => new Date(now - h * 3_600_000);

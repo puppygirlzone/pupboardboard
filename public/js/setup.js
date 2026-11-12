@@ -45,7 +45,7 @@ const SECTIONS = [
     help: ['For your own music server: the address you open Navidrome at (for example http://192.168.1.10:4533) and your normal Navidrome login.'],
   },
   { id: 'media', title: 'Media card', help: ['Which service the Media card shows. “Automatic” uses Jellyfin if it is set up, then Letterboxd, then game deals.'] },
-  { id: 'deals', title: 'Game deals', help: ['Free-to-keep PC games and the best Steam sales. Nothing to set up.'] },
+  { id: 'deals', title: 'Game deals', help: ['Free-to-keep PC games and the best Steam and GOG sales, in your currency. Nothing else to set up.'] },
   { id: 'letterboxd', title: 'Films (Letterboxd)', help: ['Films you log on ', ['letterboxd.com', 'https://letterboxd.com'], '. Just your username (or paste your profile link), no keys.'] },
   {
     id: 'jellyfin',
@@ -65,6 +65,9 @@ const CHOICE_LABELS = {
   jellyfin: 'Jellyfin',
   letterboxd: 'Letterboxd films',
   deals: 'Game deals and free games',
+  USD: 'US dollars ($)',
+  AUD: 'Australian dollars (A$)',
+  GBP: 'British pounds (£)',
   on: 'On',
   off: 'Off',
   '24h': '24-hour (14:30)',

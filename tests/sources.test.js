@@ -25,46 +25,45 @@ const recentJson = {
   },
 };
 
-test('steam: normalizeRecent tolerates junk and missing fields', () => {
-  const games = normalizeRecent(recentJson);
-  assert.equal(games.length, 2);
-  assert.equal(games[0].icon, 'https://media.steampowered.com/steamcommunity/public/images/apps/10/abc.jpg');
-  assert.equal(games[1].icon, null);
-  assert.deepEqual(normalizeRecent({}), []);
-  assert.deepEqual(normalizeRecent(null), []);
-  assert.equal(normalizeOwned({ response: {} }), null); // private profile
-  assert.equal(normalizePlayer({ response: { players: [] } }), null);
-});
-
-test('steam: without a week of history, uses the 2-week figures sorted by time', () => {
-  const d = buildSteamData({ recent: normalizeRecent(recentJson), owned: null, player: null, snapshots: null, now: NOW });
-  assert.equal(d.period.kind, 'twoWeeks');
-  assert.deepEqual(
-    d.games.map((g) => g.name),
-    ['Beta', 'Alpha'],
-  );
-  assert.equal(d.totalMinutes, 420);
-  assert.equal(d.gamesPlayed, 2);
-});
-
-test('steam: with a week-old snapshot, reports minutes played in the last 7 days', () => {
-  const snapshots = [
-    { at: NOW - 9 * DAY, totals: { 10: 100, 20: 100 } },
-    { at: NOW - 7 * DAY - 1000, totals: { 10: 900, 20: 450 } }, // newest >= 7 days old: baseline
-    { at: NOW - 2 * DAY, totals: { 10: 950, 20: 480 } },
-  ];
-  const owned = { totals: { 10: 1000, 20: 500, 30: 60 }, names: { 30: { name: 'Gamma', icon: null } }, count: 3 };
-  const d = buildSteamData({ recent: normalizeRecent(recentJson), owned, player: null, snapshots, now: NOW });
-  assert.equal(d.period.kind, 'week');
-  const byName = Object.fromEntries(d.games.map((g) => [g.name, g.minutes]));
-  assert.deepEqual(byName, { Alpha: 100, Beta: 50, Gamma: 60 }); // Gamma is new since baseline
-  assert.equal(d.totalMinutes, 210);
-  assert.equal(d.ownedCount, 3);
-});
-
-test('steam: computeWeekly needs a snapshot at least 7 days old', () => {
-  assert.equal(computeWeekly([{ at: NOW - 3 * DAY, totals: {} }], {}, NOW), null);
-  assert.ok(computeWeekly([{ at: NOW - WEEK, totals: {} }], {}, NOW));
+test('steam: parsing junk, 2-week and 7-day views, snapshot age', () => {
+  {
+    const games = normalizeRecent(recentJson);
+    assert.equal(games.length, 2);
+    assert.equal(games[0].icon, 'https://media.steampowered.com/steamcommunity/public/images/apps/10/abc.jpg');
+    assert.equal(games[1].icon, null);
+    assert.deepEqual(normalizeRecent({}), []);
+    assert.deepEqual(normalizeRecent(null), []);
+    assert.equal(normalizeOwned({ response: {} }), null); // private profile
+    assert.equal(normalizePlayer({ response: { players: [] } }), null);
+  }
+  {
+    const d = buildSteamData({ recent: normalizeRecent(recentJson), owned: null, player: null, snapshots: null, now: NOW });
+    assert.equal(d.period.kind, 'twoWeeks');
+    assert.deepEqual(
+      d.games.map((g) => g.name),
+      ['Beta', 'Alpha'],
+    );
+    assert.equal(d.totalMinutes, 420);
+    assert.equal(d.gamesPlayed, 2);
+  }
+  {
+    const snapshots = [
+      { at: NOW - 9 * DAY, totals: { 10: 100, 20: 100 } },
+      { at: NOW - 7 * DAY - 1000, totals: { 10: 900, 20: 450 } }, // newest >= 7 days old: baseline
+      { at: NOW - 2 * DAY, totals: { 10: 950, 20: 480 } },
+    ];
+    const owned = { totals: { 10: 1000, 20: 500, 30: 60 }, names: { 30: { name: 'Gamma', icon: null } }, count: 3 };
+    const d = buildSteamData({ recent: normalizeRecent(recentJson), owned, player: null, snapshots, now: NOW });
+    assert.equal(d.period.kind, 'week');
+    const byName = Object.fromEntries(d.games.map((g) => [g.name, g.minutes]));
+    assert.deepEqual(byName, { Alpha: 100, Beta: 50, Gamma: 60 }); // Gamma is new since baseline
+    assert.equal(d.totalMinutes, 210);
+    assert.equal(d.ownedCount, 3);
+  }
+  {
+    assert.equal(computeWeekly([{ at: NOW - 3 * DAY, totals: {} }], {}, NOW), null);
+    assert.ok(computeWeekly([{ at: NOW - WEEK, totals: {} }], {}, NOW));
+  }
 });
 
 test('steam history: saves hourly at most, survives a corrupt file, prunes old entries', async () => {
@@ -134,41 +133,41 @@ test('steam loader: throws when every call fails', async () => {
 
 /* --------------------------------------------------------- Navidrome */
 
-test('navidrome: subsonic token is md5(password + salt)', () => {
-  const p = subsonicAuthParams('me', 'pw', 'salty');
-  assert.equal(p.get('t'), createHash('md5').update('pwsalty').digest('hex'));
-  assert.equal(p.get('s'), 'salty');
-  assert.equal(p.get('f'), 'json');
-  assert.ok(!p.toString().includes('pw&') && !p.has('p'), 'plain password never sent');
-});
-
-test('navidrome: unwrapSubsonic rejects failed and malformed responses', () => {
-  assert.throws(() => unwrapSubsonic({ 'subsonic-response': { status: 'failed', error: { message: 'Wrong username or password' } } }), /Wrong username/);
-  assert.throws(() => unwrapSubsonic({}), /unexpected/);
-});
-
-test('navidrome: weekly stats count only plays in the last 7 days', () => {
-  const songs = normalizeSongs([
-    { id: 'a', title: 'A', artist: 'X', album: 'AX', albumId: '1', duration: 600, playDate: new Date(NOW - DAY).toISOString(), genre: 'Rock' },
-    { id: 'b', title: 'B', artist: 'X', album: 'AX', albumId: '1', duration: 300, playDate: new Date(NOW - 2 * DAY).toISOString(), genre: 'Rock' },
-    { id: 'c', title: 'C', artist: 'Y', album: 'AY', albumId: '2', duration: 300, playDate: new Date(NOW - 3 * DAY).toISOString(), genre: '' },
-    { id: 'd', title: 'D', artist: 'Z', album: 'AZ', albumId: '3', duration: 999, playDate: new Date(NOW - 8 * DAY).toISOString() },
-    { id: 'e', title: 'E', artist: 'Z', duration: 1, playDate: 'garbage' },
-  ]);
-  const s = computeListeningStats(songs, NOW);
-  assert.equal(s.tracksThisWeek, 3);
-  assert.equal(s.minutesThisWeek, 20);
-  assert.deepEqual(
-    s.topArtists.map((a) => [a.name, a.plays]),
-    [
-      ['X', 2],
-      ['Y', 1],
-    ],
-  );
-  assert.deepEqual(
-    s.topGenres.map((g) => g.name),
-    ['Rock'],
-  ); // empty genre ignored
+test('navidrome: token, response checks and weekly stats', () => {
+  {
+    const p = subsonicAuthParams('me', 'pw', 'salty');
+    assert.equal(p.get('t'), createHash('md5').update('pwsalty').digest('hex'));
+    assert.equal(p.get('s'), 'salty');
+    assert.equal(p.get('f'), 'json');
+    assert.ok(!p.toString().includes('pw&') && !p.has('p'), 'plain password never sent');
+  }
+  {
+    assert.throws(() => unwrapSubsonic({ 'subsonic-response': { status: 'failed', error: { message: 'Wrong username or password' } } }), /Wrong username/);
+    assert.throws(() => unwrapSubsonic({}), /unexpected/);
+  }
+  {
+    const songs = normalizeSongs([
+      { id: 'a', title: 'A', artist: 'X', album: 'AX', albumId: '1', duration: 600, playDate: new Date(NOW - DAY).toISOString(), genre: 'Rock' },
+      { id: 'b', title: 'B', artist: 'X', album: 'AX', albumId: '1', duration: 300, playDate: new Date(NOW - 2 * DAY).toISOString(), genre: 'Rock' },
+      { id: 'c', title: 'C', artist: 'Y', album: 'AY', albumId: '2', duration: 300, playDate: new Date(NOW - 3 * DAY).toISOString(), genre: '' },
+      { id: 'd', title: 'D', artist: 'Z', album: 'AZ', albumId: '3', duration: 999, playDate: new Date(NOW - 8 * DAY).toISOString() },
+      { id: 'e', title: 'E', artist: 'Z', duration: 1, playDate: 'garbage' },
+    ]);
+    const s = computeListeningStats(songs, NOW);
+    assert.equal(s.tracksThisWeek, 3);
+    assert.equal(s.minutesThisWeek, 20);
+    assert.deepEqual(
+      s.topArtists.map((a) => [a.name, a.plays]),
+      [
+        ['X', 2],
+        ['Y', 1],
+      ],
+    );
+    assert.deepEqual(
+      s.topGenres.map((g) => g.name),
+      ['Rock'],
+    ); // empty genre ignored
+  }
 });
 
 const subsonicOk = (body) => json({ 'subsonic-response': { status: 'ok', ...body } });
@@ -223,27 +222,28 @@ const jfItems = {
   ],
 };
 
-test('jellyfin: groups episodes by series and sorts timeline newest first', () => {
-  const g = groupRecent(normalizeItems(jfItems), NOW);
-  assert.equal(g.movies.length, 2);
-  assert.equal(g.shows.length, 1);
-  assert.equal(g.shows[0].episodes.length, 2);
-  assert.equal(g.shows[0].latestAddedAt, jfItems.Items[2].DateCreated);
-  assert.deepEqual(
-    g.timeline.map((t) => t.title),
-    ['Show A', 'Film', 'Old'],
-  );
-  assert.deepEqual(g.addedThisWeek, { movies: 1, episodes: 2 });
-  const film = g.movies[0];
-  assert.equal(film.rating, 7.5);
-  assert.equal(film.runtimeMinutes, 120);
-  assert.equal(film.genres.length, 3);
-});
-
-test('jellyfin: empty or malformed responses give empty lists', () => {
-  assert.deepEqual(normalizeItems({}), []);
-  const g = groupRecent([], NOW);
-  assert.deepEqual(g.timeline, []);
+test('jellyfin: grouping, junk responses', () => {
+  {
+    const g = groupRecent(normalizeItems(jfItems), NOW);
+    assert.equal(g.movies.length, 2);
+    assert.equal(g.shows.length, 1);
+    assert.equal(g.shows[0].episodes.length, 2);
+    assert.equal(g.shows[0].latestAddedAt, jfItems.Items[2].DateCreated);
+    assert.deepEqual(
+      g.timeline.map((t) => t.title),
+      ['Show A', 'Film', 'Old'],
+    );
+    assert.deepEqual(g.addedThisWeek, { movies: 1, episodes: 2 });
+    const film = g.movies[0];
+    assert.equal(film.rating, 7.5);
+    assert.equal(film.runtimeMinutes, 120);
+    assert.equal(film.genres.length, 3);
+  }
+  {
+    assert.deepEqual(normalizeItems({}), []);
+    const g = groupRecent([], NOW);
+    assert.deepEqual(g.timeline, []);
+  }
 });
 
 test('jellyfin loader: sends the token in the Authorization header, not the URL', async () => {
@@ -259,10 +259,4 @@ test('jellyfin loader: sends the token in the Authorization header, not the URL'
     assert.ok(!call.url.includes('JFKEY'));
     assert.match(call.init.headers.Authorization, /Token="JFKEY"/);
   }
-});
-
-test('fakeClock helper advances', () => {
-  const c = fakeClock(0);
-  c.advance(5);
-  assert.equal(c(), 5);
 });
