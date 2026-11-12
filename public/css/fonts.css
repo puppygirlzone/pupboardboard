@@ -1,5 +1,14 @@
 /* Monoid (github.com/larsenwork/monoid), self-hosted. Licence in /fonts/monoid.
  * Lighter look: normal text uses Monoid Retina, bold text uses Monoid Regular. */
+/* Aiko mode: Noto Sans JP (SIL OFL, licence in /fonts/noto-sans-jp), cut down
+ * to the characters pupboard uses. Browsers only download it in Aiko mode. */
+@font-face {
+  font-family: 'Aiko JP';
+  src: url('/fonts/noto-sans-jp/NotoSansJP-pupboard.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 @font-face {
   font-family: 'Monoid Web';
   src: url('/fonts/monoid/Monoid-Retina.ttf') format('truetype');

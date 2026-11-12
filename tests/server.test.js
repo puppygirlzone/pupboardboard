@@ -31,6 +31,8 @@ const PAGE_ASSETS = [
   '/js/menu.js',
   '/js/puppy.js',
   '/js/puppy-mode.js',
+  '/js/eggs.js',
+  '/js/i18n-ja.js',
   '/js/backdrop.js',
   '/js/live.js',
   '/vendor/anime.esm.min.js',

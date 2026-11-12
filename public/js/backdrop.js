@@ -211,7 +211,7 @@ export function startBackdrop(canvas) {
   new MutationObserver(() => {
     readColors();
     redrawStill();
-  }).observe(html, { attributes: true, attributeFilter: ['data-theme', 'data-mode', 'data-puppy'] });
+  }).observe(html, { attributes: true, attributeFilter: ['data-theme', 'data-mode', 'data-puppy', 'data-egg'] });
   reduced?.addEventListener?.('change', () => {
     ripples = [];
     redrawStill();

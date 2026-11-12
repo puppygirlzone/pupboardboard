@@ -139,7 +139,7 @@ test('Monoid Retina is the default font and its files exist', async () => {
   const { access } = await import('node:fs/promises');
   const fonts = await readFile(new URL('../public/css/fonts.css', import.meta.url), 'utf8');
   const files = [...fonts.matchAll(/url\('\/(fonts\/[^']+)'\)/g)].map((m) => m[1]);
-  assert.equal(files.length, 2);
+  assert.equal(files.length, 3, 'Monoid (2 weights) + the Japanese subset for Aiko mode');
   assert.match(fonts, /Monoid-Retina\.ttf'\) format\('truetype'\);\s*font-weight: 100 549/, 'normal text uses the lighter Retina weight');
   for (const f of files) await access(new URL(`../public/${f}`, import.meta.url));
   assert.match(styles, /--font: 'Monoid Web'/);
@@ -150,5 +150,32 @@ test('body has no background, so the dot grid and puppy paws behind it stay visi
   const body = styles.match(/\nbody \{([^}]*)\}/)?.[1] ?? '';
   assert.ok(body, 'body rule found');
   assert.ok(!/background:\s*var\(--bg\)/.test(body), 'body must not paint --bg (html does)');
-  assert.match(styles, /\nhtml \{[^}]*background: var\(--bg\)/, 'html paints the page background');
+  assert.match(styles, /\nhtml \{[^}]*background-color: var\(--bg\)/, 'html paints the page background');
+});
+
+for (const egg of ['aiko', 'cheese', 'luna', 'bird']) {
+  for (const mode of MODES) {
+    test(`${egg} mode (${mode}): every colour defined and text is readable`, () => {
+      const p = blocks.get(`:root[data-egg="${egg}"][data-theme][data-mode="${mode}"]`);
+      assert.ok(p, 'block exists');
+      for (const t of TOKENS) assert.match(p[t] ?? '', /^#[0-9a-f]{6}$/i, `--${t}`);
+      for (const bgName of ['bg', 'surface']) {
+        assert.ok(contrast(p.text, p[bgName]) >= 4.5, `text on ${bgName}`);
+        assert.ok(contrast(p.muted, p[bgName]) >= 4.5, `muted on ${bgName}: ${contrast(p.muted, p[bgName]).toFixed(2)}`);
+      }
+      for (const a of ['steam', 'music', 'media', 'news', 'ok', 'warn', 'err']) {
+        const ink = mode === 'light' ? mix(p[a], p.text, 0.55) : p[a];
+        const c = Math.min(contrast(ink, p.bg), contrast(ink, p.surface));
+        assert.ok(c >= 3, `${a} as text: ${c.toFixed(2)}`);
+      }
+    });
+  }
+}
+
+test('easter egg colours override every theme (selector is more specific)', () => {
+  const count = (sel) => (sel.match(/\[/g) ?? []).length;
+  const themeSel = [...blocks.keys()].filter((k) => k.includes('data-theme="'));
+  const eggSel = [...blocks.keys()].filter((k) => k.includes('data-egg'));
+  assert.equal(eggSel.length, 8);
+  for (const p of eggSel) for (const th of themeSel) assert.ok(count(p) > count(th), `${p} beats ${th}`);
 });
