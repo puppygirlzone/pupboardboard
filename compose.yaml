@@ -1,0 +1,38 @@
+services:
+  pupboard:
+    # The ready-made image, updated with every release. `docker compose pull`
+    # (or Dockge's Update button) fetches the newest one.
+    image: ghcr.io/puppygirlzone/pupboardboard:latest
+    # Fallback: if that image can't be downloaded, Compose builds it from this
+    # folder instead. To run your own changes: docker compose up -d --build
+    build: .
+    # "missing": use the local image if there is one, otherwise pull (and
+    # build if pulling fails). Explicit pulls still update it. Don't use
+    # "always" (breaks starting without internet) or "build" (never updates).
+    pull_policy: missing
+    container_name: pupboard
+    restart: unless-stopped
+    # Your settings (copy .env.example to .env first). Also editable in
+    # Dockge's .env editor for this stack.
+    env_file:
+      - .env
+    environment:
+      PORT: "8742"
+      DATA_DIR: /app/data
+    ports:
+      - "8742:8742"
+    volumes:
+      # Steam play-history snapshots live here (needed for the 7-day view).
+      - pupboard-data:/app/data
+      # Your news feeds: edit config/feeds.txt on the host, no restart needed.
+      - ./config:/app/config:ro
+    # If Navidrome/Jellyfin run in other compose stacks on this host, either use
+    # their LAN address in .env, or join their network, e.g.:
+    # networks: [media]
+
+volumes:
+  pupboard-data:
+
+# networks:
+#   media:
+#     external: true

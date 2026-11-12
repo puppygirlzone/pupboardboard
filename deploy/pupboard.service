@@ -1,0 +1,21 @@
+# systemd user service for running pupboard on Linux without Docker.
+# Install (adjust WorkingDirectory if pupboard lives somewhere else):
+#   mkdir -p ~/.config/systemd/user
+#   cp deploy/pupboard.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now pupboard
+#   loginctl enable-linger "$USER"   # keep running when logged out
+[Unit]
+Description=pupboard stats dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/pupboard
+ExecStart=/usr/bin/env node --env-file-if-exists=.env server/index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

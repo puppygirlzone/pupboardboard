@@ -1,0 +1,56 @@
+pupboard
+========
+
+A colourful homepage that shows your gaming, music, films/TV and news at a glance.
+
+
+STARTING IT
+
+  Windows:  double-click "Start pupboard.bat".
+            If Windows says "Windows protected your PC", click "More info",
+            then "Run anyway". (It says this about any new download that
+            isn't from a big company.)
+
+  macOS:    right-click "Start pupboard.command" and choose Open, then Open
+            again. (Only needed the first time; after that, double-click.)
+
+  Linux:    double-click "start-pupboard.sh" and choose "Run in terminal",
+            or run ./start-pupboard.sh in a terminal.
+
+A small black window opens, then your browser opens pupboard. Keep the black
+window open while you use the dashboard. Closing it stops pupboard.
+
+
+SETTING IT UP
+
+The first time, your browser opens the Settings page. Fill in what you use
+(Steam, Navidrome, Jellyfin, news feeds) and press Save. Anything you skip
+just shows "Not set up".
+
+To change settings later, start pupboard and click the gear button at the
+top right of the dashboard. For safety, the settings page only works in a
+browser on this same computer, using the link shown in the black window.
+
+
+OPENING IT ON YOUR PHONE
+
+On the Settings page, under Network, choose "Any device on my home network",
+save, and restart pupboard. Then open http://<this computer's IP>:8742 on
+your phone. (Your firewall may ask whether to allow it: allow it on private
+networks only.)
+
+
+UPDATING
+
+Download the new zip, unzip it, and copy the "data" and "config" folders
+from your old pupboard folder into the new one. They hold your settings,
+feeds and gaming history.
+
+
+STOPPING / REMOVING
+
+Close the black window to stop it. To remove pupboard, delete this folder.
+Nothing is installed anywhere else.
+
+
+Problems or ideas: open an issue on the project's GitHub page.

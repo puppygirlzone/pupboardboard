@@ -1,0 +1,16 @@
+/* Monoid (github.com/larsenwork/monoid), self-hosted. Licence in /fonts/monoid.
+ * Lighter look: normal text uses Monoid Retina, bold text uses Monoid Regular. */
+@font-face {
+  font-family: 'Monoid Web';
+  src: url('/fonts/monoid/Monoid-Retina.ttf') format('truetype');
+  font-weight: 100 549;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Monoid Web';
+  src: url('/fonts/monoid/Monoid-Regular.ttf') format('truetype');
+  font-weight: 550 900;
+  font-style: normal;
+  font-display: swap;
+}

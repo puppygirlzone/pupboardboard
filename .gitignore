@@ -1,0 +1,31 @@
+# Dependencies (rebuilt by `npm install`)
+node_modules/
+
+# Secrets: real settings files. Only the blank template is committed.
+.env
+.env.*
+!.env.example
+
+# Your personal feed list (config/feeds.example.txt is the committed template)
+config/feeds.txt
+
+# Runtime data (Steam play history) and half-written files
+data/
+*.tmp
+
+# Claude Code personal settings for this folder (launch.json is shared)
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor and OS leftovers
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+build/
