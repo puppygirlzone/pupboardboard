@@ -4,7 +4,7 @@ import { writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 
-import { normalizeRecent, normalizeOwned, normalizePlayer, buildSteamData, createSteamLoader } from '../server/sources/steam.js';
+import { normalizeRecent, normalizeOwned, normalizePlayer, buildSteamData, createSteamLoader, parseSteamHide } from '../server/sources/steam.js';
 import { createSteamHistory, computeWeekly, WEEK } from '../server/sources/steam-history.js';
 import { subsonicAuthParams, unwrapSubsonic, normalizeSongs, computeListeningStats, createNavidromeLoader } from '../server/sources/navidrome.js';
 import { normalizeItems, groupRecent, createJellyfinLoader } from '../server/sources/jellyfin.js';
@@ -64,6 +64,42 @@ test('steam: parsing junk, 2-week and 7-day views, snapshot age', () => {
     assert.equal(computeWeekly([{ at: NOW - 3 * DAY, totals: {} }], {}, NOW), null);
     assert.ok(computeWeekly([{ at: NOW - WEEK, totals: {} }], {}, NOW));
   }
+});
+
+test('steam: background apps (STEAM_HIDE) are left out of hours, counts, lists and "Playing"', () => {
+  const recent = normalizeRecent({
+    response: {
+      games: [
+        { appid: 629520, name: 'Soundpad', playtime_2weeks: 11000, playtime_forever: 90000 },
+        { appid: 999, name: 'bongo cat ', playtime_2weeks: 10000, playtime_forever: 80000 },
+        { appid: 10, name: 'Alpha', playtime_2weeks: 120, playtime_forever: 1000 },
+      ],
+    },
+  });
+  const player = normalizePlayer({ response: { players: [{ personaname: 'p', personastate: 1, gameextrainfo: 'Bongo Cat', gameid: '999' }] } });
+  assert.equal(player.inGameId, 999);
+
+  // Default list matches by name, ignoring case and spaces.
+  const d = buildSteamData({ recent, owned: null, player, snapshots: null, now: NOW, hide: parseSteamHide('') });
+  assert.deepEqual(d.games.map((g) => g.name), ['Alpha']);
+  assert.equal(d.totalMinutes, 120);
+  assert.equal(d.gamesPlayed, 1);
+  assert.equal(d.minutes2Weeks, 120);
+  assert.equal(d.player.inGame, null);
+
+  // App IDs work, and a custom list replaces the defaults.
+  const byId = buildSteamData({ recent, owned: null, player, snapshots: null, now: NOW, hide: parseSteamHide('629520') });
+  assert.deepEqual(byId.games.map((g) => g.name).sort(), ['Alpha', 'bongo cat ']);
+  assert.equal(byId.player.inGame, 'Bongo Cat');
+
+  // "none" counts everything; the 7-day view (names from the library) is filtered too.
+  assert.equal(buildSteamData({ recent, owned: null, player, snapshots: null, now: NOW, hide: parseSteamHide('None') }).gamesPlayed, 3);
+  const snapshots = [{ at: NOW - 8 * DAY, totals: { 629520: 0, 10: 0, 30: 0 } }];
+  const owned = { totals: { 629520: 500, 10: 60, 30: 40 }, names: { 30: { name: 'Wallpaper Engine', icon: null } }, count: 3 };
+  const week = buildSteamData({ recent, owned, player: null, snapshots, now: NOW, hide: parseSteamHide() });
+  assert.equal(week.period.kind, 'week');
+  assert.deepEqual(week.games.map((g) => g.name), ['Alpha']);
+  assert.equal(week.totalMinutes, 60);
 });
 
 test('steam history: saves hourly at most, survives a corrupt file, prunes old entries', async () => {

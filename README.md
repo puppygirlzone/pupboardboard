@@ -81,7 +81,7 @@ Only set up what you use. Everything else just stays off.
 
 | Card | Service | What you need |
 |---|---|---|
-| Gaming | Steam | Your profile link and a [free key](https://steamcommunity.com/dev/apikey) (any domain name works). Set your profile's **Game details** to Public. |
+| Gaming | Steam | Your profile link and a [free key](https://steamcommunity.com/dev/apikey) (any domain name works). Set your profile's **Game details** to Public. Background apps such as Soundpad, Bongo Cat and Wallpaper Engine aren't counted as games; change the list with `STEAM_HIDE` or in Settings. |
 | Music | Spotify, via [ListenBrainz](https://listenbrainz.org) | **Just a username.** Make a free ListenBrainz account and connect Spotify there (Settings → Music services). Also works with YouTube Music, Jellyfin, Plex and more. |
 | Music | Navidrome | Your Navidrome address and normal login. |
 | Media | Game deals | **Nothing.** On by default, in US$, A$ or £. |

@@ -26,6 +26,28 @@ export function parseSteamProfile(value) {
   return /^[A-Za-z0-9_-]{2,32}$/.test(v) ? { vanity: v } : null;
 }
 
+/**
+ * Steam counts some always-running desktop apps as games, which floods the
+ * hours. These are hidden unless STEAM_HIDE says otherwise ("none" shows all).
+ */
+export const DEFAULT_STEAM_HIDE = ['Soundpad', 'Bongo Cat', 'Wallpaper Engine'];
+
+/** STEAM_HIDE ("Name, 12345, ...") into a matcher on { appid, name }. */
+export function parseSteamHide(value) {
+  const raw = String(value ?? '').trim();
+  const list = raw ? (/^none$/i.test(raw) ? [] : raw.split(',')) : DEFAULT_STEAM_HIDE;
+  const ids = new Set();
+  const names = new Set();
+  for (const item of list.map((x) => x.trim()).filter(Boolean)) {
+    if (/^\d{1,10}$/.test(item)) ids.add(Number(item));
+    else names.add(item.toLowerCase());
+  }
+  return { ids, names };
+}
+
+const isHidden = (hide, appid, name) =>
+  Boolean(hide) && (hide.ids.has(Number(appid)) || (name != null && hide.names.has(String(name).trim().toLowerCase())));
+
 /** Demo mode: invented games get local placeholder art instead of Steam's CDN. */
 export function withDemoArt(data) {
   const art = (appid, w, h) => `/api/demo-art/game-${appid}?w=${w}&h=${h}`;
@@ -70,12 +92,16 @@ export function normalizePlayer(json) {
     profileUrl: p.profileurl || null,
     status: states[p.personastate] ?? 'Offline',
     inGame: p.gameextrainfo || null,
+    inGameId: Number(p.gameid) || null,
   };
 }
 
 /** Pure: turns raw pieces into the shape the frontend uses. */
-export function buildSteamData({ recent, owned, player, snapshots, now, warnings = [] }) {
-  const byId = new Map(recent.map((g) => [g.appid, g]));
+export function buildSteamData({ recent: allRecent, owned, player, snapshots, now, warnings = [], hide = null }) {
+  // Hidden apps (see STEAM_HIDE) are left out of every number and list.
+  const recent = allRecent.filter((g) => !isHidden(hide, g.appid, g.name));
+  if (player?.inGame && isHidden(hide, player.inGameId, player.inGame)) player = { ...player, inGame: null };
+  const byId = new Map(allRecent.map((g) => [g.appid, g]));
   const currentTotals = owned?.totals ?? Object.fromEntries(recent.map((g) => [g.appid, g.minutesForever]));
   const weekly = snapshots ? computeWeekly(snapshots, currentTotals, now) : null;
 
@@ -101,7 +127,7 @@ export function buildSteamData({ recent, owned, player, snapshots, now, warnings
     period = { kind: 'twoWeeks', label: 'Last 2 weeks', since: new Date(now - 14 * 86_400_000).toISOString() };
     games = recent.map((g) => ({ ...g, minutes: g.minutes2Weeks }));
   }
-  games = games.filter((g) => g.minutes > 0).sort((a, b) => b.minutes - a.minutes);
+  games = games.filter((g) => g.minutes > 0 && !isHidden(hide, g.appid, g.name)).sort((a, b) => b.minutes - a.minutes);
 
   const since = snapshots ? trackingSince(snapshots) : null;
   return {
@@ -119,6 +145,7 @@ export function buildSteamData({ recent, owned, player, snapshots, now, warnings
 
 export function createSteamLoader({ config, fetchImpl, history, now = Date.now }) {
   const { apiKey } = config.steam;
+  const hide = parseSteamHide(config.steam.hide);
   const opts = { timeoutMs: config.timeoutMs };
   const profile = parseSteamProfile(config.steam.steamId);
   let steamId = profile?.id ?? null;
@@ -165,6 +192,7 @@ export function createSteamLoader({ config, fetchImpl, history, now = Date.now }
       snapshots,
       now: at,
       warnings,
+      hide,
     });
     // Without a week of history the numbers come from "recent games". If that
     // call failed, the result would be a misleading 0h, so treat it as a failure
