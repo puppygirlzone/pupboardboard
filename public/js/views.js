@@ -6,7 +6,7 @@
 //   data-count=N          number counts up to N (text already holds the final value)
 //   data-bar=0..1         bar grows to this fraction of its track
 
-import { escapeHtml as e, formatMinutes, formatDuration, timeAgo, toHours, plural } from './format.js';
+import { escapeHtml as e, formatMinutes, formatDuration, timeAgo, toHours, plural, formatMoney } from './format.js';
 
 const ICONS = {
   steam:
@@ -454,28 +454,31 @@ ${warningsNote(d)}`;
 
 /* ----------------------------------------------------------- Game deals */
 
-const price = (n) => (Number.isFinite(n) ? `$${n.toFixed(2)}` : '');
 const until = (iso, now) => {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return 'while it lasts';
   const days = Math.ceil((t - now) / 86_400_000);
   return days <= 0 ? 'ends today' : days === 1 ? 'ends tomorrow' : `${days} days left`;
 };
-const dealsCredit = `<p class="note" data-anim>Free games from ${ext('https://www.gamerpower.com', 'GamerPower')}, Steam sales from ${ext('https://www.cheapshark.com', 'CheapShark')} (US prices).</p>`;
+const CURRENCY_NAMES = { USD: 'US', AUD: 'Australian', GBP: 'UK' };
+const dealsCredit = (cur) =>
+  `<p class="note" data-anim>Free games from ${ext('https://store.epicgames.com/free-games', 'Epic')} and ${ext('https://www.gamerpower.com', 'GamerPower')}; Steam sales picked by ${ext('https://www.cheapshark.com', 'CheapShark')} with Steam's ${e(CURRENCY_NAMES[cur] ?? 'US')} prices; GOG sales from GOG. ${cur === 'USD' ? '' : '“≈” values are converted from US dollars.'}</p>`;
 
-function freebieRow(g, now) {
+function freebieRow(g, now, cur) {
   const title = g.url ? `<a href="${e(g.url)}" target="_blank" rel="noopener noreferrer">${e(g.title)}</a>` : e(g.title);
+  const worth = g.worth ? formatMoney(g.worth, g.worthCurrency, { shown: cur, approx: g.worthApprox }) : '';
   return `<li class="row" data-anim>
   ${img(g.image, g.title, 'thumb thumb-game')}
   <div class="row-main"><div class="row-title">${title}</div><div class="muted small">${e(g.store)} · ${e(until(g.endsAt, now))}</div></div>
-  <div class="row-value">${g.worth ? `<s class="muted small">${e(price(g.worth))}</s> ` : ''}Free</div>
+  <div class="row-value">${worth ? `<s class="muted small">${e(worth)}</s> ` : ''}Free</div>
 </li>`;
 }
 
-function dealRow(d) {
+function dealRow(d, cur) {
+  const was = d.normalPrice ? `<s>${e(formatMoney(d.normalPrice, d.currency, { shown: cur }))}</s> ` : '';
   return `<li class="row" data-anim>
   ${img(d.image, d.title, 'thumb thumb-game')}
-  <div class="row-main"><div class="row-title"><a href="${e(d.url)}" target="_blank" rel="noopener noreferrer">${e(d.title)}</a></div><div class="muted small">${d.normalPrice ? `<s>${e(price(d.normalPrice))}</s> ` : ''}${e(price(d.price))}${d.rating ? ` · ${d.rating}% positive` : ''}</div></div>
+  <div class="row-main"><div class="row-title"><a href="${e(d.url)}" target="_blank" rel="noopener noreferrer">${e(d.title)}</a></div><div class="muted small">${e(d.store ?? 'Steam')} · ${was}${e(formatMoney(d.price, d.currency, { shown: cur }))}${d.rating ? ` · ${e(d.rating)}% positive` : ''}</div></div>
   <div class="row-value"><span class="pill pill-ok">-${e(d.savings)}%</span></div>
 </li>`;
 }
@@ -483,12 +486,14 @@ function dealRow(d) {
 export function dealsGlance(env, now = Date.now()) {
   const d = env?.data;
   if (!d) return cardShell('deals', env, emptyState('deals', env), now);
+  const cur = d.currency ?? 'USD';
   const free = d.freebies ?? [];
-  const deals = d.deals ?? [];
-  const rows = [...free.slice(0, 2).map((g) => freebieRow(g, now)), ...deals.slice(0, 4 - Math.min(free.length, 2)).map(dealRow)].join('');
+  const sales = [d.deals?.[0], d.gog?.[0], ...(d.deals ?? []).slice(1)].filter(Boolean);
+  const rows = [...free.slice(0, 2).map((g) => freebieRow(g, now, cur)), ...sales.slice(0, 4 - Math.min(free.length, 2)).map((s) => dealRow(s, cur))].join('');
+  const worth = d.freeWorth ? `worth ${formatMoney(d.freeWorth, cur, { approx: d.freeWorthApprox })}` : 'PC games to keep';
   const body = `<div class="stats">
-  ${stat('Free right now', d.hasFreebies === false ? '—' : count(free.length, String(free.length)), d.freeWorth ? `worth ${price(d.freeWorth)}` : 'PC games to keep')}
-  ${stat('Best Steam sale', d.hasDeals === false || !d.bestSaving ? '—' : `-${count(d.bestSaving, String(d.bestSaving), { suffix: '%' })}`, 'off right now')}
+  ${stat('Free right now', d.hasFreebies === false ? '—' : count(free.length, String(free.length)), worth)}
+  ${stat('Best sale', d.hasDeals === false && d.hasGog === false ? '—' : d.bestSaving ? `-${count(d.bestSaving, String(d.bestSaving), { suffix: '%' })}` : '—', 'off right now')}
 </div>
 ${rows ? `<ul class="rows">${rows}</ul>` : '<p class="muted" data-anim>No deals right now.</p>'}`;
   return cardShell('deals', env, body, now);
@@ -498,20 +503,24 @@ export function dealsDetail(env, now = Date.now()) {
   const d = env?.data;
   const head = pageHead('deals', 'Game deals', env, now);
   if (!d) return head + emptyState('deals', env);
+  const cur = d.currency ?? 'USD';
   const free = d.freebies ?? [];
-  const deals = d.deals ?? [];
+  const steam = d.deals ?? [];
+  const gog = d.gog ?? [];
+  const list = (items, ok, failed, none) => (items.length ? `<ul class="rows">${items.map((s) => dealRow(s, cur)).join('')}</ul>` : `<p class="muted">${ok === false ? failed : none}</p>`);
   return `${head}
 <section class="stats stats-wide">
   ${stat('Free right now', d.hasFreebies === false ? '—' : count(free.length, String(free.length)), 'PC games to keep')}
-  ${stat('Total worth', d.hasFreebies === false || !d.freeWorth ? '—' : e(price(d.freeWorth)), 'if you grabbed them all')}
-  ${stat('Steam sales', d.hasDeals === false ? '—' : count(deals.length, String(deals.length)), 'top rated deals')}
-  ${stat('Best discount', d.hasDeals === false || !d.bestSaving ? '—' : `-${count(d.bestSaving, String(d.bestSaving), { suffix: '%' })}`)}
+  ${stat('Total worth', d.hasFreebies === false || !d.freeWorth ? '—' : e(formatMoney(d.freeWorth, cur, { approx: d.freeWorthApprox })), 'if you grabbed them all')}
+  ${stat('On sale', d.hasDeals === false && d.hasGog === false ? '—' : count(steam.length + gog.length, String(steam.length + gog.length)), 'Steam + GOG')}
+  ${stat('Best discount', !d.bestSaving ? '—' : `-${count(d.bestSaving, String(d.bestSaving), { suffix: '%' })}`)}
 </section>
 <div class="columns columns-2">
-  <section class="panel" data-anim><h2>Free to keep</h2>${free.length ? `<ul class="rows">${free.map((g) => freebieRow(g, now)).join('')}</ul>` : `<p class="muted">${d.hasFreebies === false ? "Couldn't check for free games right now." : 'No free games right now. Check back soon.'}</p>`}</section>
-  <section class="panel" data-anim><h2>Best Steam sales</h2>${deals.length ? `<ul class="rows">${deals.map(dealRow).join('')}</ul>` : `<p class="muted">${d.hasDeals === false ? "Couldn't load Steam sales right now." : 'No big sales right now.'}</p>`}</section>
+  <section class="panel" data-anim><h2>Free to keep</h2>${free.length ? `<ul class="rows">${free.map((g) => freebieRow(g, now, cur)).join('')}</ul>` : `<p class="muted">${d.hasFreebies === false ? "Couldn't check for free games right now." : 'No free games right now. Check back soon.'}</p>`}</section>
+  <section class="panel" data-anim><h2>Best Steam sales</h2>${list(steam, d.hasDeals, "Couldn't load Steam sales right now.", 'No big Steam sales right now.')}</section>
 </div>
-${dealsCredit}
+<section class="panel" data-anim><h2>GOG sales</h2>${list(gog, d.hasGog, "Couldn't load GOG sales right now.", 'No GOG sales right now.')}</section>
+${dealsCredit(cur)}
 ${warningsNote(d)}`;
 }
 

@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { EGGS, EGG_NAMES, EGG_KEY, ICONS, eggForWord, validEgg, eggToast, eggGreeting, eggVerb, createWordDetector, floaterIcons } from '../public/js/eggs.js';
 import { translate, japaneseCharacters } from '../public/js/i18n-ja.js';
-import { PUPPY_KEY } from '../public/js/puppy.js';
+import { PUPPY_KEY, PAW_SVG, timeSlot, createTapCounter } from '../public/js/puppy.js';
+import { pawBurst, toastOut } from '../public/js/motion.js';
 
 const at = (y, m, d, h) => new Date(y, m - 1, d, h, 30);
 
@@ -30,9 +31,33 @@ test('typing a word anywhere triggers its mode; other keys never do', () => {
   assert.deepEqual(type('wo of'), []);
   assert.equal(press('Shift'), null);
   assert.deepEqual(type('LUNA'), ['luna']);
+  assert.deepEqual(type('wwoof'), ['puppy'], 'extra leading letters are fine');
+  press('w');
+  press('o');
+  assert.equal(press('ArrowUp'), null, 'arrow keys are ignored, not a reset');
+  assert.deepEqual(type('of'), ['puppy']);
+});
+
+test('five quick taps on the greeting open the box; slow taps do not', () => {
+  let t = 0;
+  const tap = createTapCounter(5, 2000, () => t);
+  for (let i = 0; i < 4; i++) {
+    assert.equal(tap(), false);
+    t += 300;
+  }
+  assert.equal(tap(), true, '5th tap within 2s');
+  const slow = createTapCounter(5, 2000, () => t);
+  let fired = false;
+  for (let i = 0; i < 6; i++) {
+    fired ||= slow();
+    t += 900;
+  }
+  assert.equal(fired, false);
 });
 
 test('each mode has greetings for every time of day, steady all day', () => {
+  const slots = [2, 5, 12, 18].map((h) => timeSlot(at(2026, 11, 12, h)));
+  assert.deepEqual(slots, ['night', 'morning', 'afternoon', 'evening'], 'same boundaries as the normal greeting');
   for (const name of EGG_NAMES) {
     for (const slot of ['night', 'morning', 'afternoon', 'evening']) assert.ok(EGGS[name].greetings[slot].length >= 3, `${name} ${slot}`);
     const a = eggGreeting(name, at(2026, 11, 12, 13));
@@ -88,9 +113,17 @@ test('the Japanese font subset covers every character the translations use', asy
   await readFile(new URL('../public/fonts/noto-sans-jp/LICENSE.txt', import.meta.url));
 });
 
-test('boot script restores any mode before first paint, and only known ones', async () => {
+test('boot script restores any mode before first paint (old puppy setting too), and only known ones', async () => {
   const boot = await readFile(new URL('../public/js/theme-boot.js', import.meta.url), 'utf8');
+  assert.ok(boot.includes(`'${PUPPY_KEY}'`), 'an older saved "puppy on" still works');
+  assert.match(boot, /setAttribute\('data-puppy', 'on'\)/);
   assert.ok(boot.includes(`'${EGG_KEY}'`));
   assert.match(boot, /\^\(puppy\|aiko\|cheese\|luna\|bird\)\$/);
   for (const name of EGG_NAMES) assert.ok(boot.includes(name), name);
+});
+
+test('bursts and toasts are harmless without anime.js', async () => {
+  assert.doesNotThrow(() => pawBurst(null, PAW_SVG));
+  assert.doesNotThrow(() => pawBurst({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) }, PAW_SVG));
+  await toastOut({}); // resolves straight away
 });

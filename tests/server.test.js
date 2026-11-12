@@ -123,79 +123,81 @@ test('a hanging upstream does not hold the summary past its budget', async () =>
   }
 });
 
-test('security headers, path traversal and unknown routes', async () => {
-  const { dir, cleanup } = await tempDir();
-  const app = await start({ config: baseConfig({ dataDir: dir }), fetchImpl: stubFetch([]) });
-  try {
-    const home = await fetch(`${app.base}/`);
-    assert.match(home.headers.get('content-security-policy'), /script-src 'self'/);
-    assert.equal(home.headers.get('x-content-type-options'), 'nosniff');
-    for (const bad of ['/..%2fpackage.json', '/%2e%2e/server/config.js', '/nope.html', '/api/nope']) {
-      assert.equal((await fetch(app.base + bad)).status, 404, bad);
+test('security headers, path traversal, malformed paths and unknown routes', async () => {
+  {
+    const { dir, cleanup } = await tempDir();
+    const app = await start({ config: baseConfig({ dataDir: dir }), fetchImpl: stubFetch([]) });
+    try {
+      const home = await fetch(`${app.base}/`);
+      assert.match(home.headers.get('content-security-policy'), /script-src 'self'/);
+      assert.equal(home.headers.get('x-content-type-options'), 'nosniff');
+      for (const bad of ['/..%2fpackage.json', '/%2e%2e/server/config.js', '/nope.html', '/api/nope']) {
+        assert.equal((await fetch(app.base + bad)).status, 404, bad);
+      }
+      assert.equal((await fetch(`${app.base}/api/health`, { method: 'POST' })).status, 405);
+    } finally {
+      await app.stop();
+      await cleanup();
     }
-    assert.equal((await fetch(`${app.base}/api/health`, { method: 'POST' })).status, 405);
-  } finally {
-    await app.stop();
-    await cleanup();
+  }
+  {
+    const { dir, cleanup } = await tempDir();
+    const app = await start({ config: baseConfig({ dataDir: dir }), fetchImpl: stubFetch([]) });
+    try {
+      assert.equal((await fetch(`${app.base}/%E0%A4%A`)).status, 400);
+      assert.equal((await fetch(`${app.base}/index.html%00.js`)).status, 404);
+      assert.equal((await fetch(`${app.base}/`)).status, 200, 'still serving afterwards');
+    } finally {
+      await app.stop();
+      await cleanup();
+    }
   }
 });
 
-test('image proxy: rejects unsafe ids, passes images through, hides upstream errors', async () => {
-  const { dir, cleanup } = await tempDir();
-  const fetchImpl = stubFetch([
-    [(u) => u.includes('getCoverArt') && u.includes('id=good'), () => new Response('PNGDATA', { headers: { 'content-type': 'image/png' } })],
-    [(u) => u.includes('getCoverArt'), () => new Response('<html>', { headers: { 'content-type': 'text/html' } })],
-    [(u) => u.includes('/Images/Primary'), () => new Response('', { status: 500 })],
-  ]);
-  const app = await start({ config: baseConfig({ dataDir: dir }), fetchImpl });
-  try {
-    const ok = await fetch(`${app.base}/api/img/navidrome/good?size=99999`);
-    assert.equal(ok.status, 200);
-    assert.equal(ok.headers.get('content-type'), 'image/png');
-    assert.match(fetchImpl.calls.at(-1).url, /size=800/, 'size is clamped');
-    assert.equal((await fetch(`${app.base}/api/img/navidrome/notimage`)).status, 404, 'non-image content refused');
-    assert.equal((await fetch(`${app.base}/api/img/jellyfin/abc123`)).status, 404);
-    const before = fetchImpl.calls.length;
-    assert.equal((await fetch(`${app.base}/api/img/jellyfin/..%2F..%2Fetc`)).status, 404);
-    assert.equal((await fetch(`${app.base}/api/img/navidrome/a.b`)).status, 404);
-    assert.equal(fetchImpl.calls.length, before, 'unsafe ids never reach upstream');
-  } finally {
-    await app.stop();
-    await cleanup();
+test('image proxy: safe ids only, sandboxed, size-capped, upstream errors hidden', async () => {
+  {
+    const { dir, cleanup } = await tempDir();
+    const fetchImpl = stubFetch([
+      [(u) => u.includes('getCoverArt') && u.includes('id=good'), () => new Response('PNGDATA', { headers: { 'content-type': 'image/png' } })],
+      [(u) => u.includes('getCoverArt'), () => new Response('<html>', { headers: { 'content-type': 'text/html' } })],
+      [(u) => u.includes('/Images/Primary'), () => new Response('', { status: 500 })],
+    ]);
+    const app = await start({ config: baseConfig({ dataDir: dir }), fetchImpl });
+    try {
+      const ok = await fetch(`${app.base}/api/img/navidrome/good?size=99999`);
+      assert.equal(ok.status, 200);
+      assert.equal(ok.headers.get('content-type'), 'image/png');
+      assert.match(fetchImpl.calls.at(-1).url, /size=800/, 'size is clamped');
+      assert.equal((await fetch(`${app.base}/api/img/navidrome/notimage`)).status, 404, 'non-image content refused');
+      assert.equal((await fetch(`${app.base}/api/img/jellyfin/abc123`)).status, 404);
+      const before = fetchImpl.calls.length;
+      assert.equal((await fetch(`${app.base}/api/img/jellyfin/..%2F..%2Fetc`)).status, 404);
+      assert.equal((await fetch(`${app.base}/api/img/navidrome/a.b`)).status, 404);
+      assert.equal(fetchImpl.calls.length, before, 'unsafe ids never reach upstream');
+    } finally {
+      await app.stop();
+      await cleanup();
+    }
   }
-});
-
-test('malformed paths get a 400, not a crash', async () => {
-  const { dir, cleanup } = await tempDir();
-  const app = await start({ config: baseConfig({ dataDir: dir }), fetchImpl: stubFetch([]) });
-  try {
-    assert.equal((await fetch(`${app.base}/%E0%A4%A`)).status, 400);
-    assert.equal((await fetch(`${app.base}/index.html%00.js`)).status, 404);
-    assert.equal((await fetch(`${app.base}/`)).status, 200, 'still serving afterwards');
-  } finally {
-    await app.stop();
-    await cleanup();
-  }
-});
-
-test('image proxy: sandboxes images and refuses oversized ones', async () => {
-  const { dir, cleanup } = await tempDir();
-  const big = 'x'.repeat(10_000_001);
-  const fetchImpl = stubFetch([
-    [(u) => u.includes('id=huge'), () => new Response(big, { headers: { 'content-type': 'image/png' } })],
-    [(u) => u.includes('id=liar'), () => new Response('x', { headers: { 'content-type': 'image/png', 'content-length': '99999999' } })],
-    [(u) => u.includes('getCoverArt'), () => new Response('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', { headers: { 'content-type': 'image/svg+xml' } })],
-  ]);
-  const app = await start({ config: baseConfig({ dataDir: dir }), fetchImpl });
-  try {
-    const svg = await fetch(`${app.base}/api/img/navidrome/svg1`);
-    assert.equal(svg.status, 200);
-    assert.match(svg.headers.get('content-security-policy'), /default-src 'none'.*sandbox/);
-    assert.equal((await fetch(`${app.base}/api/img/navidrome/huge`)).status, 404);
-    assert.equal((await fetch(`${app.base}/api/img/navidrome/liar`)).status, 404);
-  } finally {
-    await app.stop();
-    await cleanup();
+  {
+    const { dir, cleanup } = await tempDir();
+    const big = 'x'.repeat(10_000_001);
+    const fetchImpl = stubFetch([
+      [(u) => u.includes('id=huge'), () => new Response(big, { headers: { 'content-type': 'image/png' } })],
+      [(u) => u.includes('id=liar'), () => new Response('x', { headers: { 'content-type': 'image/png', 'content-length': '99999999' } })],
+      [(u) => u.includes('getCoverArt'), () => new Response('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', { headers: { 'content-type': 'image/svg+xml' } })],
+    ]);
+    const app = await start({ config: baseConfig({ dataDir: dir }), fetchImpl });
+    try {
+      const svg = await fetch(`${app.base}/api/img/navidrome/svg1`);
+      assert.equal(svg.status, 200);
+      assert.match(svg.headers.get('content-security-policy'), /default-src 'none'.*sandbox/);
+      assert.equal((await fetch(`${app.base}/api/img/navidrome/huge`)).status, 404);
+      assert.equal((await fetch(`${app.base}/api/img/navidrome/liar`)).status, 404);
+    } finally {
+      await app.stop();
+      await cleanup();
+    }
   }
 });
 

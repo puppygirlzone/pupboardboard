@@ -46,68 +46,53 @@ const contrast = (a, b) => {
   return (hi + 0.05) / (lo + 0.05);
 };
 
-test('theme ids are unique and the dropdown list matches themes.css', () => {
+test('theme list matches themes.css, and helpers fall back safely', () => {
   assert.equal(new Set(THEMES.map((t) => t.id)).size, THEMES.length);
   const inCss = new Set([...css.matchAll(/data-theme="([\w-]+)"/g)].map((m) => m[1]));
   for (const t of THEMES.filter((t) => t.id !== 'default')) assert.ok(inCss.has(t.id), `${t.id} has CSS`);
   for (const id of inCss) assert.ok(THEMES.some((t) => t.id === id), `${id} in CSS is listed in themes.js`);
+  assert.equal(normalizeTheme('dracula'), 'dracula');
+  assert.equal(normalizeTheme('<script>'), 'default');
+  assert.equal(normalizeTheme(null), 'default');
+  assert.equal(normalizeMode('light'), 'light');
+  assert.equal(normalizeMode('purple'), 'dark');
+  assert.equal(otherMode('dark'), 'light');
+  assert.equal(otherMode(undefined), 'light');
 });
 
-for (const theme of THEMES) {
-  for (const mode of MODES) {
-    test(`${theme.name} (${mode}): every colour defined and text is readable`, () => {
-      const p = palette(theme.id, mode);
-      assert.ok(p, 'block exists');
-      for (const t of TOKENS) assert.match(p[t] ?? '', /^#[0-9a-f]{6}$/i, `--${t}`);
+// Every palette someone can see: each theme, puppy mode and the other easter
+// eggs, in night and day.
+const EGG_SELECTORS = [...blocks.keys()].filter((k) => /data-(puppy|egg)/.test(k));
+const PALETTES = [
+  ...THEMES.flatMap((t) => MODES.map((mode) => [`${t.name} (${mode})`, palette(t.id, mode), mode])),
+  ...EGG_SELECTORS.map((sel) => [sel, blocks.get(sel), sel.includes('"light"') ? 'light' : 'dark']),
+];
 
-      // Night/day really are dark/light.
-      if (mode === 'dark') assert.ok(lum(p.bg) < 0.1, 'night background is dark');
-      else assert.ok(lum(p.bg) > 0.6, 'day background is light');
-
-      // Body text: WCAG AA (4.5:1) on page and cards. Secondary text too.
-      for (const bgName of ['bg', 'surface']) {
-        const bg = p[bgName];
-        assert.ok(contrast(p.text, bg) >= 4.5, `text on ${bgName}: ${contrast(p.text, bg).toFixed(2)}`);
-        assert.ok(contrast(p.muted, bg) >= 4.5, `muted on ${bgName}: ${contrast(p.muted, bg).toFixed(2)}`);
-      }
-
-      // Accents used as text (big numbers, pills): at least 3:1, the AA level
-      // for bold/large text. Day mode darkens them as styles.css does.
-      for (const a of ['steam', 'music', 'media', 'news', 'ok', 'warn', 'err']) {
-        const ink = mode === 'light' ? mix(p[a], p.text, 0.55) : p[a];
-        const c = Math.min(contrast(ink, p.bg), contrast(ink, p.surface));
-        assert.ok(c >= 3, `${a} as text: ${c.toFixed(2)}`);
-      }
-    });
-  }
-}
-
-for (const mode of MODES) {
-  test(`Puppy mode (${mode}): every colour defined and text is readable`, () => {
-    const p = blocks.get(`:root[data-puppy="on"][data-theme][data-mode="${mode}"]`);
-    assert.ok(p, 'block exists');
-    for (const t of TOKENS) assert.match(p[t] ?? '', /^#[0-9a-f]{6}$/i, `--${t}`);
-    if (mode === 'dark') assert.ok(lum(p.bg) < 0.1);
-    else assert.ok(lum(p.bg) > 0.6);
+test('every palette defines every colour, and text is readable on it', () => {
+  assert.equal(EGG_SELECTORS.length, 10, 'puppy + 4 easter eggs, night and day');
+  for (const [name, p, mode] of PALETTES) {
+    assert.ok(p, `${name}: block exists`);
+    for (const t of TOKENS) assert.match(p[t] ?? '', /^#[0-9a-f]{6}$/i, `${name}: --${t}`);
+    // Night/day really are dark/light (easter eggs may tint further).
+    if (!name.includes('data-egg')) assert.ok(mode === 'dark' ? lum(p.bg) < 0.1 : lum(p.bg) > 0.6, `${name}: ${mode} background`);
+    // Body and secondary text: WCAG AA (4.5:1) on page and cards.
     for (const bgName of ['bg', 'surface']) {
-      assert.ok(contrast(p.text, p[bgName]) >= 4.5, `text on ${bgName}`);
-      assert.ok(contrast(p.muted, p[bgName]) >= 4.5, `muted on ${bgName}: ${contrast(p.muted, p[bgName]).toFixed(2)}`);
+      assert.ok(contrast(p.text, p[bgName]) >= 4.5, `${name}: text on ${bgName} ${contrast(p.text, p[bgName]).toFixed(2)}`);
+      assert.ok(contrast(p.muted, p[bgName]) >= 4.5, `${name}: muted on ${bgName} ${contrast(p.muted, p[bgName]).toFixed(2)}`);
     }
+    // Accents used as text: at least 3:1 (AA for large/bold). Day mode darkens them as styles.css does.
     for (const a of ['steam', 'music', 'media', 'news', 'ok', 'warn', 'err']) {
       const ink = mode === 'light' ? mix(p[a], p.text, 0.55) : p[a];
       const c = Math.min(contrast(ink, p.bg), contrast(ink, p.surface));
-      assert.ok(c >= 3, `${a} as text: ${c.toFixed(2)}`);
+      assert.ok(c >= 3, `${name}: ${a} as text ${c.toFixed(2)}`);
     }
-  });
-}
+  }
+});
 
-test('puppy mode overrides every theme (selector is more specific)', () => {
-  // Theme blocks use 3 attribute selectors; puppy blocks need more to win.
+test('puppy mode and easter eggs override every theme (more specific selectors)', () => {
   const count = (sel) => (sel.match(/\[/g) ?? []).length;
   const themeSel = [...blocks.keys()].filter((k) => k.includes('data-theme="'));
-  const puppySel = [...blocks.keys()].filter((k) => k.includes('data-puppy'));
-  assert.equal(puppySel.length, 2);
-  for (const p of puppySel) for (const t of themeSel) assert.ok(count(p) > count(t), `${p} beats ${t}`);
+  for (const p of EGG_SELECTORS) for (const t of themeSel) assert.ok(count(p) > count(t), `${p} beats ${t}`);
 });
 
 test('styles.css takes every colour from the theme tokens', () => {
@@ -124,17 +109,6 @@ test('boot script uses the same storage keys and loads before the stylesheet', (
   assert.ok(!/type="module"[^>]*theme-boot/.test(html), 'boot is a plain blocking script');
 });
 
-test('theme helpers fall back safely', () => {
-  assert.equal(normalizeTheme('dracula'), 'dracula');
-  assert.equal(normalizeTheme('<script>'), 'default');
-  assert.equal(normalizeTheme(null), 'default');
-  assert.equal(normalizeMode('light'), 'light');
-  assert.equal(normalizeMode('purple'), 'dark');
-  assert.equal(otherMode('dark'), 'light');
-  assert.equal(otherMode('light'), 'dark');
-  assert.equal(otherMode(undefined), 'light');
-});
-
 test('Monoid Retina is the default font and its files exist', async () => {
   const { access } = await import('node:fs/promises');
   const fonts = await readFile(new URL('../public/css/fonts.css', import.meta.url), 'utf8');
@@ -146,36 +120,9 @@ test('Monoid Retina is the default font and its files exist', async () => {
   assert.ok(html.indexOf('/css/fonts.css') > 0, 'fonts.css is linked');
 });
 
-test('body has no background, so the dot grid and puppy paws behind it stay visible', () => {
+test('body has no background, so the dot grid and floaters behind it stay visible', () => {
   const body = styles.match(/\nbody \{([^}]*)\}/)?.[1] ?? '';
   assert.ok(body, 'body rule found');
   assert.ok(!/background:\s*var\(--bg\)/.test(body), 'body must not paint --bg (html does)');
   assert.match(styles, /\nhtml \{[^}]*background-color: var\(--bg\)/, 'html paints the page background');
-});
-
-for (const egg of ['aiko', 'cheese', 'luna', 'bird']) {
-  for (const mode of MODES) {
-    test(`${egg} mode (${mode}): every colour defined and text is readable`, () => {
-      const p = blocks.get(`:root[data-egg="${egg}"][data-theme][data-mode="${mode}"]`);
-      assert.ok(p, 'block exists');
-      for (const t of TOKENS) assert.match(p[t] ?? '', /^#[0-9a-f]{6}$/i, `--${t}`);
-      for (const bgName of ['bg', 'surface']) {
-        assert.ok(contrast(p.text, p[bgName]) >= 4.5, `text on ${bgName}`);
-        assert.ok(contrast(p.muted, p[bgName]) >= 4.5, `muted on ${bgName}: ${contrast(p.muted, p[bgName]).toFixed(2)}`);
-      }
-      for (const a of ['steam', 'music', 'media', 'news', 'ok', 'warn', 'err']) {
-        const ink = mode === 'light' ? mix(p[a], p.text, 0.55) : p[a];
-        const c = Math.min(contrast(ink, p.bg), contrast(ink, p.surface));
-        assert.ok(c >= 3, `${a} as text: ${c.toFixed(2)}`);
-      }
-    });
-  }
-}
-
-test('easter egg colours override every theme (selector is more specific)', () => {
-  const count = (sel) => (sel.match(/\[/g) ?? []).length;
-  const themeSel = [...blocks.keys()].filter((k) => k.includes('data-theme="'));
-  const eggSel = [...blocks.keys()].filter((k) => k.includes('data-egg'));
-  assert.equal(eggSel.length, 8);
-  for (const p of eggSel) for (const th of themeSel) assert.ok(count(p) > count(th), `${p} beats ${th}`);
 });

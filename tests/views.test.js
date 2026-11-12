@@ -10,31 +10,32 @@ import { tempDir } from './helpers.js';
 
 const NOW = Date.parse('2026-11-12T12:00:00Z');
 
-test('format helpers', () => {
-  assert.equal(escapeHtml(`<a href="x">'&'</a>`), '&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;');
-  assert.equal(escapeHtml(null), '');
-  assert.equal(formatMinutes(0), '0m');
-  assert.equal(formatMinutes(45), '45m');
-  assert.equal(formatMinutes(135), '2h 15m');
-  assert.equal(formatMinutes(120), '2h');
-  assert.equal(formatMinutes(6001), '100h');
-  assert.equal(formatMinutes('junk'), '0m');
-  assert.equal(formatDuration(225), '3:45');
-  assert.equal(formatDuration(3725), '1:02:05');
-  assert.equal(toHours(1360), 22.7);
-  assert.equal(timeAgo(new Date(NOW - 10_000).toISOString(), NOW), 'just now');
-  assert.equal(timeAgo(new Date(NOW - 3 * 3_600_000).toISOString(), NOW), '3h ago');
-  assert.equal(timeAgo('nonsense', NOW), '');
-  assert.equal(plural(1, 'track'), '1 track');
-  assert.equal(plural(2, 'track'), '2 tracks');
-  assert.equal(greeting(new Date(2026, 0, 1, 9)), 'Good morning');
-});
-
-test('routes resolve, unknown hashes fall back to overview', () => {
-  assert.equal(resolveRoute('#/music'), 'music');
-  assert.equal(resolveRoute('#/gaming?x=1'), 'gaming');
-  assert.equal(resolveRoute('#/does-not-exist'), '');
-  assert.equal(resolveRoute(undefined), '');
+test('format helpers and routes', () => {
+  {
+    assert.equal(escapeHtml(`<a href="x">'&'</a>`), '&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;');
+    assert.equal(escapeHtml(null), '');
+    assert.equal(formatMinutes(0), '0m');
+    assert.equal(formatMinutes(45), '45m');
+    assert.equal(formatMinutes(135), '2h 15m');
+    assert.equal(formatMinutes(120), '2h');
+    assert.equal(formatMinutes(6001), '100h');
+    assert.equal(formatMinutes('junk'), '0m');
+    assert.equal(formatDuration(225), '3:45');
+    assert.equal(formatDuration(3725), '1:02:05');
+    assert.equal(toHours(1360), 22.7);
+    assert.equal(timeAgo(new Date(NOW - 10_000).toISOString(), NOW), 'just now');
+    assert.equal(timeAgo(new Date(NOW - 3 * 3_600_000).toISOString(), NOW), '3h ago');
+    assert.equal(timeAgo('nonsense', NOW), '');
+    assert.equal(plural(1, 'track'), '1 track');
+    assert.equal(plural(2, 'track'), '2 tracks');
+    assert.equal(greeting(new Date(2026, 0, 1, 9)), 'Good morning');
+  }
+  {
+    assert.equal(resolveRoute('#/music'), 'music');
+    assert.equal(resolveRoute('#/gaming?x=1'), 'gaming');
+    assert.equal(resolveRoute('#/does-not-exist'), '');
+    assert.equal(resolveRoute(undefined), '');
+  }
 });
 
 const ALL_STATES = [undefined, null, { status: 'loading' }, { status: 'unconfigured' }, { status: 'error', error: 'boom <script>' }];
@@ -64,23 +65,52 @@ test('overview shows four cards in a fixed order', () => {
   assert.deepEqual(order, ['steam', 'navidrome', 'jellyfin', 'rss']);
 });
 
-test('news links: only http(s), open in a new tab without leaking the page', () => {
-  const env = {
-    status: 'ok',
-    updatedAt: new Date(NOW).toISOString(),
-    data: {
-      newToday: 1,
-      feeds: [{ name: 'F', site: 'javascript:alert(1)', ok: true, items: [] }],
-      latest: [
-        { title: 'Good', link: 'https://ok.example/a', feed: 'F', date: new Date(NOW - 3_600_000).toISOString() },
-        { title: 'Evil', link: 'javascript:alert(1)', feed: 'F' },
-      ],
-    },
-  };
-  for (const html of [rssGlance(env, NOW), rssDetail(env, NOW)]) {
-    assert.ok(!html.includes('javascript:'), 'no javascript: hrefs');
-    assert.match(html, /href="https:\/\/ok\.example\/a" target="_blank" rel="noopener noreferrer"/);
-    assert.match(html, /1h ago/);
+test('views: escaping, safe links, clamped bars, no misleading zeros', () => {
+  {
+    const env = {
+      status: 'ok',
+      updatedAt: new Date(NOW).toISOString(),
+      data: {
+        newToday: 1,
+        feeds: [{ name: 'F', site: 'javascript:alert(1)', ok: true, items: [] }],
+        latest: [
+          { title: 'Good', link: 'https://ok.example/a', feed: 'F', date: new Date(NOW - 3_600_000).toISOString() },
+          { title: 'Evil', link: 'javascript:alert(1)', feed: 'F' },
+        ],
+      },
+    };
+    for (const html of [rssGlance(env, NOW), rssDetail(env, NOW)]) {
+      assert.ok(!html.includes('javascript:'), 'no javascript: hrefs');
+      assert.match(html, /href="https:\/\/ok\.example\/a" target="_blank" rel="noopener noreferrer"/);
+      assert.match(html, /1h ago/);
+    }
+  }
+  {
+    const evil = '<img src=x onerror=alert(1)>';
+    const env = (data) => ({ status: 'ok', updatedAt: new Date(NOW).toISOString(), data });
+    const html = [
+      steamDetail(env({ period: { kind: 'twoWeeks', label: 'L', since: '' }, totalMinutes: 5, gamesPlayed: 1, minutes2Weeks: 5, games: [{ appid: 1, name: evil, minutes: 5, minutes2Weeks: 5, minutesForever: 5 }], player: { name: evil, status: 'Online' } }), NOW),
+      navidromeDetail(env({ nowPlaying: [{ title: evil, artist: evil, coverId: '"><x' }], recentlyPlayed: [], stats: { topArtists: [{ name: evil, plays: 1 }] }, topSongs: [], recentAlbums: [], frequentAlbums: [] }), NOW),
+      jellyfinDetail(env({ movies: [{ id: 'm', name: evil, overview: evil, genres: [evil] }], shows: [{ id: 's', imageId: 's', name: evil, episodes: [{ name: evil }] }], timeline: [] }), NOW),
+    ].join('');
+    assert.ok(!html.includes('<img src=x'), 'raw tag must not appear');
+    assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'));
+  }
+  {
+    const env = { status: 'ok', updatedAt: new Date(NOW).toISOString(), data: { period: { kind: 'twoWeeks', label: 'L' }, totalMinutes: 90, gamesPlayed: 2, minutes2Weeks: 90, games: [{ appid: 1, name: 'A', minutes: 60 }, { appid: 2, name: 'B', minutes: 30 }] } };
+    const html = overview({ steam: env }, NOW);
+    const bars = [...html.matchAll(/data-bar="([\d.]+)"/g)].map((m) => Number(m[1]));
+    assert.deepEqual(bars, [1, 0.5]);
+    assert.match(html, /data-count="1.5"[^>]*>1.5h</);
+  }
+  {
+    const env = (data) => ({ status: 'ok', updatedAt: new Date(NOW).toISOString(), data: { warnings: ['x'], ...data } });
+    const media = overview({ jellyfin: env({ hasItems: false, counts: { movies: 1, series: 1, episodes: 1 }, addedThisWeek: { movies: 0, episodes: 0 }, timeline: [] }) }, NOW);
+    assert.match(media, /New movies/);
+    assert.ok(!media.includes('data-count="0"'), 'no zero counters for jellyfin');
+    assert.match(media, /unavailable right now/);
+    const music = overview({ navidrome: env({ hasSongHistory: false, stats: { tracksThisWeek: 0, minutesThisWeek: 0 }, nowPlaying: [], recentlyPlayed: [] }) }, NOW);
+    assert.ok(!music.includes('data-count="0"'), 'no zero counters for music');
   }
 });
 
@@ -91,26 +121,6 @@ test('status pills reflect freshness', () => {
   assert.match(statusPill({ status: 'stale', updatedAt: at, data: {} }, NOW), /Offline/);
   assert.match(statusPill({ status: 'offline', updatedAt: at, data: {} }, NOW), /Saved copy/);
   assert.match(statusPill({ status: 'error' }, NOW), /Unavailable/);
-});
-
-test('data from upstreams is escaped (no HTML injection via game/song/movie names)', () => {
-  const evil = '<img src=x onerror=alert(1)>';
-  const env = (data) => ({ status: 'ok', updatedAt: new Date(NOW).toISOString(), data });
-  const html = [
-    steamDetail(env({ period: { kind: 'twoWeeks', label: 'L', since: '' }, totalMinutes: 5, gamesPlayed: 1, minutes2Weeks: 5, games: [{ appid: 1, name: evil, minutes: 5, minutes2Weeks: 5, minutesForever: 5 }], player: { name: evil, status: 'Online' } }), NOW),
-    navidromeDetail(env({ nowPlaying: [{ title: evil, artist: evil, coverId: '"><x' }], recentlyPlayed: [], stats: { topArtists: [{ name: evil, plays: 1 }] }, topSongs: [], recentAlbums: [], frequentAlbums: [] }), NOW),
-    jellyfinDetail(env({ movies: [{ id: 'm', name: evil, overview: evil, genres: [evil] }], shows: [{ id: 's', imageId: 's', name: evil, episodes: [{ name: evil }] }], timeline: [] }), NOW),
-  ].join('');
-  assert.ok(!html.includes('<img src=x'), 'raw tag must not appear');
-  assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'));
-});
-
-test('animation hooks: bars are clamped to 0..1, counters carry final values', () => {
-  const env = { status: 'ok', updatedAt: new Date(NOW).toISOString(), data: { period: { kind: 'twoWeeks', label: 'L' }, totalMinutes: 90, gamesPlayed: 2, minutes2Weeks: 90, games: [{ appid: 1, name: 'A', minutes: 60 }, { appid: 2, name: 'B', minutes: 30 }] } };
-  const html = overview({ steam: env }, NOW);
-  const bars = [...html.matchAll(/data-bar="([\d.]+)"/g)].map((m) => Number(m[1]));
-  assert.deepEqual(bars, [1, 0.5]);
-  assert.match(html, /data-count="1.5"[^>]*>1.5h</);
 });
 
 test('renders the real demo API output on every page (contract between server and views)', async () => {
@@ -134,16 +144,6 @@ test('renders the real demo API output on every page (contract between server an
   } finally {
     await cleanup();
   }
-});
-
-test('unknown numbers show a dash, not a misleading 0', () => {
-  const env = (data) => ({ status: 'ok', updatedAt: new Date(NOW).toISOString(), data: { warnings: ['x'], ...data } });
-  const media = overview({ jellyfin: env({ hasItems: false, counts: { movies: 1, series: 1, episodes: 1 }, addedThisWeek: { movies: 0, episodes: 0 }, timeline: [] }) }, NOW);
-  assert.match(media, /New movies/);
-  assert.ok(!media.includes('data-count="0"'), 'no zero counters for jellyfin');
-  assert.match(media, /unavailable right now/);
-  const music = overview({ navidrome: env({ hasSongHistory: false, stats: { tracksThisWeek: 0, minutesThisWeek: 0 }, nowPlaying: [], recentlyPlayed: [] }) }, NOW);
-  assert.ok(!music.includes('data-count="0"'), 'no zero counters for music');
 });
 
 test('random partial data never crashes a view (fuzz)', () => {

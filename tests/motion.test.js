@@ -11,40 +11,39 @@ function el(props = {}) {
   return { style: {}, dataset: {}, attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, querySelectorAll: () => [], querySelector: () => null, ...props };
 }
 
-test('enter/refresh without anime.js: bars at full size, page visible', () => {
-  const bars = [el({ dataset: { bar: '0.5' } }), el({ dataset: { bar: '1.000' } })];
-  const root = el({ style: { opacity: '0', transform: 'translateY(-10px)' }, querySelectorAll: (sel) => (sel === '[data-bar]' ? bars : []) });
-  enter(root);
-  assert.equal(root.style.opacity, '', 'leftover fade-out cleared');
-  assert.equal(root.style.transform, '');
-  assert.deepEqual(bars.map((b) => b.style.transform), ['scaleX(0.5)', 'scaleX(1.000)']);
-  bars.forEach((b) => (b.style.transform = ''));
-  refresh(root);
-  assert.equal(bars[0].style.transform, 'scaleX(0.5)');
-});
-
-test('leave without anime.js resolves straight away', async () => {
-  const t0 = Date.now();
-  await leave(el());
-  assert.ok(Date.now() - t0 < 50);
-});
-
-test('nav highlight jumps to the active link without anime.js', () => {
-  const pill = el();
-  const link = el({ offsetLeft: 120, offsetWidth: 80 });
-  const nav = el({ querySelector: (sel) => (sel === '.nav-indicator' ? pill : sel === 'a.active' ? link : null) });
-  moveNavIndicator(nav);
-  assert.equal(pill.style.transform, 'translateX(120px)');
-  assert.equal(pill.style.width, '80px');
-  assert.equal(pill.style.opacity, '1');
-  moveNavIndicator(el({ querySelector: (sel) => (sel === '.nav-indicator' ? pill : null) }));
-  assert.equal(pill.style.opacity, '0', 'hidden when no link is active');
-});
-
-test('small effects are harmless no-ops without anime.js', () => {
-  assert.doesNotThrow(() => pulse(el()));
-  assert.doesNotThrow(() => spin(el()));
-  assert.doesNotThrow(() => pulse(null));
+test('without anime.js everything ends in its final state and nothing throws', async () => {
+  {
+    const bars = [el({ dataset: { bar: '0.5' } }), el({ dataset: { bar: '1.000' } })];
+    const root = el({ style: { opacity: '0', transform: 'translateY(-10px)' }, querySelectorAll: (sel) => (sel === '[data-bar]' ? bars : []) });
+    enter(root);
+    assert.equal(root.style.opacity, '', 'leftover fade-out cleared');
+    assert.equal(root.style.transform, '');
+    assert.deepEqual(bars.map((b) => b.style.transform), ['scaleX(0.5)', 'scaleX(1.000)']);
+    bars.forEach((b) => (b.style.transform = ''));
+    refresh(root);
+    assert.equal(bars[0].style.transform, 'scaleX(0.5)');
+  }
+  {
+    const t0 = Date.now();
+    await leave(el());
+    assert.ok(Date.now() - t0 < 50);
+  }
+  {
+    const pill = el();
+    const link = el({ offsetLeft: 120, offsetWidth: 80 });
+    const nav = el({ querySelector: (sel) => (sel === '.nav-indicator' ? pill : sel === 'a.active' ? link : null) });
+    moveNavIndicator(nav);
+    assert.equal(pill.style.transform, 'translateX(120px)');
+    assert.equal(pill.style.width, '80px');
+    assert.equal(pill.style.opacity, '1');
+    moveNavIndicator(el({ querySelector: (sel) => (sel === '.nav-indicator' ? pill : null) }));
+    assert.equal(pill.style.opacity, '0', 'hidden when no link is active');
+  }
+  {
+    assert.doesNotThrow(() => pulse(el()));
+    assert.doesNotThrow(() => spin(el()));
+    assert.doesNotThrow(() => pulse(null));
+  }
 });
 
 test('donut slices: percentages add to 100, extra games go to Other', () => {

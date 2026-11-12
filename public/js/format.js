@@ -86,3 +86,16 @@ export function greeting(date = new Date(), timeZone = null) {
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
 }
+
+const MONEY_SYMBOL = { USD: '$', AUD: 'A$', GBP: '£' };
+
+/**
+ * "A$12.49". A US-dollar price on a dashboard set to another currency shows
+ * as "US$12.49" so it can't be mistaken; approx adds "≈" (converted prices).
+ */
+export function formatMoney(amount, currency = 'USD', { shown = currency, approx = false } = {}) {
+  const n = Number(amount);
+  if (amount == null || !Number.isFinite(n)) return '';
+  const symbol = currency === 'USD' && shown !== 'USD' ? 'US$' : MONEY_SYMBOL[currency] ?? `${currency} `;
+  return `${approx ? '≈' : ''}${symbol}${n.toFixed(2)}`;
+}

@@ -45,6 +45,7 @@ export const SETTINGS_FIELDS = [
     check: (v) => (validLetterboxdUser(v) ? null : 'is not a valid Letterboxd username (letters, numbers and _ only)'),
   },
   { key: 'DEALS', section: 'deals', label: 'Game deals and free games', choices: ['on', 'off'] },
+  { key: 'DEALS_CURRENCY', section: 'deals', label: 'Currency for prices', choices: ['USD', 'AUD', 'GBP'] },
   { key: 'TIME_ZONE', section: 'clock', label: 'Time zone' },
   { key: 'CLOCK_FORMAT', section: 'clock', label: 'Clock format', choices: ['24h', '12h'] },
   { key: 'HOST', section: 'network', label: 'Who can open the dashboard', choices: ['127.0.0.1', '0.0.0.0'], restart: true },

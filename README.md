@@ -100,7 +100,7 @@ Everything below can be filled in on the **Settings** page (gear button, top rig
 | Music | Spotify via [ListenBrainz](https://listenbrainz.org) | **Just a username.** Make a free ListenBrainz account, connect Spotify there (Settings → Music services), and it records your plays. Also works with YouTube Music, Jellyfin, Plex and others that ListenBrainz supports. |
 | Music | Spotify direct (optional) | Live "now playing" straight from Spotify. Spotify only allows this with **Spotify Premium** and your own free developer app: see [Spotify direct](#spotify-direct). |
 | Music | Navidrome | Your Navidrome address and normal login. |
-| Media | Game deals | **Nothing.** On by default: free-to-keep PC games (from [GamerPower](https://www.gamerpower.com)) and top Steam sales (from [CheapShark](https://www.cheapshark.com), US prices). |
+| Media | Game deals | **Nothing.** On by default: free-to-keep PC games (from Epic and [GamerPower](https://www.gamerpower.com)) and the best Steam and GOG sales, in **US$, A$ or £** (Settings → Game deals). |
 | Media | Letterboxd | **Just a username** (or your profile link). |
 | Media | Jellyfin | Your Jellyfin address and an API key (Jellyfin Dashboard → API Keys → **+**). |
 | News | RSS / Atom | Nothing: gaming news by default. See [News feeds](#news-feeds). |
@@ -175,7 +175,7 @@ A few secondary-text greys are slightly adjusted from the originals so small tex
 - **Spotify** only shares your last 50 plays. If all 50 are from this week, the card shows **50+** rather than a made-up total.
 - **ListenBrainz** counts every play, repeats included. If most plays have no track length, listening time shows "—" instead of a number that's too low. "Now playing" depends on your music app reporting it, so it can lag a little.
 - **Letterboxd**'s feed holds about your last 50 diary entries, so a very busy month shows as "50+".
-- **Game deals** prices are in US dollars (CheapShark). If one of the deal sites is down, its number shows "—", not 0.
+- **Game deals** use real local Steam, GOG and Epic prices in your currency. Free games from other stores only have a US price, so theirs is converted at today's exchange rate and marked "≈". If a deal site is down, its number shows "—", not 0.
 
 ## All settings
 
@@ -188,6 +188,7 @@ Everything can go in `.env` (see [`.env.example`](.env.example) for the full lis
 | `TIME_ZONE`, `CLOCK_FORMAT` | browser's zone, `24h` | Clock |
 | `MUSIC_SOURCE`, `MEDIA_SOURCE` | `auto` | Which service fills the Music / Media card |
 | `DEALS` | `on` | `off` hides game deals |
+| `DEALS_CURRENCY` | `USD` | `AUD` or `GBP` for deal prices |
 | `SETUP_PAGE` | `1` | `0` turns the Settings page off |
 | `DATA_DIR` | `./data` | Where settings and Steam history are stored |
 | `DEMO_MODE` | `0` | `1` = made-up data |
@@ -229,6 +230,6 @@ pupboard is free software under the [GNU GPL v3 or later](LICENSE).
 
 It bundles [Monoid](https://github.com/larsenwork/monoid) (MIT / SIL OFL, see `public/fonts/monoid/LICENSE.txt`) and [anime.js](https://animejs.com/) (MIT). The download zips include [Node.js](https://nodejs.org) (MIT, see `runtime/LICENSE-node.txt`).
 
-Game deals data comes from [GamerPower](https://www.gamerpower.com) and [CheapShark](https://www.cheapshark.com); cover art for ListenBrainz plays from the [Cover Art Archive](https://coverartarchive.org).
+Game deals data comes from [GamerPower](https://www.gamerpower.com), [CheapShark](https://www.cheapshark.com), Steam, GOG and Epic, with exchange rates from [Frankfurter](https://frankfurter.dev); cover art for ListenBrainz plays from the [Cover Art Archive](https://coverartarchive.org).
 
 Not affiliated with Valve, Spotify, ListenBrainz, Letterboxd, Navidrome, Jellyfin, GamerPower or CheapShark.
