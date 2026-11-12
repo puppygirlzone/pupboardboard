@@ -31,4 +31,7 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" build/*.zip --title "pupboard $GITHUB_REF_NAME" --generate-notes
+        run: |
+          # Notes come from CHANGELOG.md; a test makes sure the section exists.
+          scripts/release-notes.sh "$GITHUB_REF_NAME" > notes.md
+          gh release create "$GITHUB_REF_NAME" build/*.zip --title "pupboard $GITHUB_REF_NAME" --notes-file notes.md

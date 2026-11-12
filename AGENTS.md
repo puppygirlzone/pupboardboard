@@ -26,6 +26,7 @@ The overview page is the at-a-glance view. Each source has a detail page with mo
 ### Definition of done (for any change)
 
 - `npm test` passes, and new behaviour has tests.
+- `CHANGELOG.md` has a line under **Unreleased** for anything a user would notice (in plain words, never naming the secret words). Releasing: rename Unreleased to the new version and date, bump `package.json`/lockfile, then tag `vX.Y.Z`; the release notes come from that section (a test checks it exists). Fixes bump the last number, new features the middle one, anything that breaks an existing setup the first.
 - The dashboard loads in a browser **3 times in a row without errors** while upstream APIs fail randomly (`npm run demo` fails ~25% of requests on purpose). Check the console.
 - The Docker image still builds (`docker compose build`).
 - If packaging changed: `NODE_BINARY=$(command -v node) scripts/package-release.sh linux x64` still builds and the unzipped launcher starts.

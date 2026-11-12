@@ -57,3 +57,13 @@ test('release downloads: every launcher opens the browser and stays on this comp
   const release = await read('.github/workflows/release.yml');
   for (const target of ['win-x64', 'darwin-arm64', 'darwin-x64', 'linux-x64']) assert.ok(release.includes(target), target);
 });
+
+test('every released version has a CHANGELOG section, used as the release notes', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { version } = JSON.parse(await read('package.json'));
+  const changelog = await read('CHANGELOG.md');
+  assert.match(changelog, new RegExp(`^## \\[${version.replace(/\./g, '\\.')}\\] - \\d{4}-\\d{2}-\\d{2}$`, 'm'), `CHANGELOG.md needs a "## [${version}] - date" section`);
+  const notes = execFileSync(new URL('../scripts/release-notes.sh', import.meta.url).pathname, [`v${version}`], { encoding: 'utf8' });
+  assert.ok(notes.trim().length > 20 && !notes.includes('## ['), 'release notes are just that version');
+  assert.match(await read('.github/workflows/release.yml'), /release-notes\.sh "\$GITHUB_REF_NAME"/);
+});
