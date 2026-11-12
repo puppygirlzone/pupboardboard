@@ -13,13 +13,14 @@ export function jellyfinHeaders(apiKey) {
 }
 
 const asArray = (v) => (Array.isArray(v) ? v : []);
+const int = (v) => (Number.isInteger(Number(v)) && v !== null && v !== '' ? Number(v) : null);
 
 export function normalizeItems(json) {
   return asArray(json?.Items).map((i) => ({
     id: String(i.Id),
     type: i.Type,
     name: String(i.Name ?? 'Untitled'),
-    year: i.ProductionYear ?? null,
+    year: int(i.ProductionYear),
     addedAt: i.DateCreated ?? null,
     overview: i.Overview ?? '',
     genres: asArray(i.Genres).slice(0, 3),
@@ -28,8 +29,8 @@ export function normalizeItems(json) {
     runtimeMinutes: i.RunTimeTicks ? Math.round(i.RunTimeTicks / TICKS_PER_MINUTE) : null,
     seriesId: i.SeriesId ? String(i.SeriesId) : null,
     seriesName: i.SeriesName ?? null,
-    season: i.ParentIndexNumber ?? null,
-    episode: i.IndexNumber ?? null,
+    season: int(i.ParentIndexNumber),
+    episode: int(i.IndexNumber),
   }));
 }
 
@@ -95,7 +96,7 @@ export function createJellyfinLoader({ config, fetchImpl, now = Date.now }) {
       items: async () => normalizeItems(await fetchJson(fetchImpl, `${url}/Items?${itemsQuery}`, opts)),
       counts: async () => {
         const c = await fetchJson(fetchImpl, `${url}/Items/Counts`, opts);
-        return { movies: c?.MovieCount ?? 0, series: c?.SeriesCount ?? 0, episodes: c?.EpisodeCount ?? 0 };
+        return { movies: int(c?.MovieCount) ?? 0, series: int(c?.SeriesCount) ?? 0, episodes: int(c?.EpisodeCount) ?? 0 };
       },
       server: async () => (await fetchJson(fetchImpl, `${url}/System/Info/Public`, opts))?.ServerName ?? null,
     }, memory);

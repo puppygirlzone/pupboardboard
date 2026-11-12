@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { isConfigured, loadConfig, resolveSlots } from './config.js';
 import { readSettings, writeSettings, mergeSettings, describeSettings, applyChanges, MAX_FEEDS_TEXT } from './settings.js';
-import { createCachedSource, hostOf, safeMessage } from './resilience.js';
+import { createCachedSource, hostOf, safeMessage, readCapped } from './resilience.js';
 import { createSteamLoader } from './sources/steam.js';
 import { createSteamHistory } from './sources/steam-history.js';
 import { createNavidromeLoader, createNowPlayingFetcher, navidromeCoverUrl } from './sources/navidrome.js';
@@ -63,6 +63,16 @@ const MAX_SETUP_BODY = 64_000;
  * through a reverse proxy on the same machine). Returns null if allowed, else
  * a reason the page can explain.
  */
+/** True when the Host header names this computer (localhost, 127.0.0.1, [::1]). */
+export function loopbackHostHeader(req) {
+  try {
+    return LOOPBACK_HOSTS.has(new URL(`http://${req.headers.host ?? ''}`).hostname);
+  } catch {
+    return false;
+  }
+}
+const LOOPBACK_BINDS = new Set(['127.0.0.1', '::1', 'localhost']);
+
 export function setupRefusal(req, { config, setup }) {
   if (!setup || !config.setupEnabled) return 'disabled';
   if (config.demo) return 'demo';
@@ -178,9 +188,7 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
       const upstream = await fetchImpl(upstreamUrl, { headers, signal: AbortSignal.timeout(config.timeoutMs) });
       const type = upstream.headers.get('content-type') ?? '';
       if (!upstream.ok || !type.startsWith('image/')) return send(res, 404, 'image unavailable');
-      if (Number(upstream.headers.get('content-length')) > MAX_IMAGE_BYTES) return send(res, 404, 'image unavailable');
-      const buf = Buffer.from(await upstream.arrayBuffer());
-      if (buf.length > MAX_IMAGE_BYTES) return send(res, 404, 'image unavailable');
+      const buf = await readCapped(upstream, MAX_IMAGE_BYTES, hostOf(upstreamUrl)); // throws past the cap: 404 below
       send(res, 200, buf, { 'content-type': type, 'cache-control': 'public, max-age=86400', 'content-security-policy': IMAGE_CSP });
     } catch (err) {
       console.warn(`[image] ${hostOf(upstreamUrl)}: ${err?.name ?? 'error'}`);
@@ -223,11 +231,15 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
     if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return sendJson(res, 415, { error: 'expected JSON' }), null;
     const origin = req.headers.origin;
     if (origin && origin !== `http://${req.headers.host}`) return sendJson(res, 403, { error: 'not-local' }), null;
+    let parsed;
     try {
-      return JSON.parse((await readBody(req, MAX_SETUP_BODY)) || '{}') ?? {};
+      parsed = JSON.parse((await readBody(req, MAX_SETUP_BODY)) || '{}');
     } catch (err) {
       return sendJson(res, err.status ?? 400, { error: err.status === 413 ? 'too large' : 'invalid JSON' }), null;
     }
+    // Only a JSON object is a valid request (0, false, "" or [] would otherwise look like "already answered").
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return sendJson(res, 400, { error: 'expected a JSON object' }), null;
+    return parsed;
   }
 
   async function handleSpotify(req, res, p, url) {
@@ -312,6 +324,10 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
   }
 
   async function handle(req, res) {
+    // Only listening on this computer (the download's default)? Then only answer
+    // requests addressed to this computer: stops a web page using DNS rebinding
+    // to read your stats through the browser.
+    if (LOOPBACK_BINDS.has(config.host) && !loopbackHostHeader(req)) return send(res, 403, 'forbidden', { 'content-type': 'text/plain' });
     const url = new URL(req.url, 'http://localhost');
     const p = url.pathname;
     if (p === '/api/setup') return handleSetup(req, res);

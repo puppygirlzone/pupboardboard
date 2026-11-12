@@ -396,7 +396,7 @@ export function jellyfinGlance(env, now = Date.now()) {
   ${stat('New movies', known ? count(week.movies, String(week.movies)) : '—', 'this week')}
   ${stat('New episodes', known ? count(week.episodes, String(week.episodes)) : '—', 'this week')}
 </div>
-${c ? `<p class="highlight" data-anim>Library: <strong>${c.movies}</strong> movies · <strong>${c.series}</strong> shows · <strong>${c.episodes}</strong> episodes</p>` : ''}
+${c ? `<p class="highlight" data-anim>Library: <strong>${e(c.movies)}</strong> movies · <strong>${e(c.series)}</strong> shows · <strong>${e(c.episodes)}</strong> episodes</p>` : ''}
 ${posters ? `<div class="poster-strip">${posters}</div>` : `<p class="muted" data-anim>${known ? 'Nothing added recently.' : 'Recently added items unavailable right now.'}</p>`}`;
   return cardShell('jellyfin', env, body, now);
 }
@@ -413,7 +413,7 @@ export function jellyfinDetail(env, now = Date.now()) {
       (m) => `<article class="media-card" data-anim>
   ${img(posterUrl(m.id, 360), m.name, 'media-art')}
   <div class="media-body">
-    <h3>${e(m.name)} ${m.year ? `<span class="muted">(${m.year})</span>` : ''}</h3>
+    <h3>${e(m.name)} ${m.year ? `<span class="muted">(${e(m.year)})</span>` : ''}</h3>
     <div class="chips">${[m.officialRating, m.runtimeMinutes ? formatMinutes(m.runtimeMinutes) : null, m.rating ? `★ ${m.rating}` : null, ...m.genres]
       .filter(Boolean)
       .map((x) => `<span class="chip">${e(x)}</span>`)
@@ -432,7 +432,7 @@ export function jellyfinDetail(env, now = Date.now()) {
     <h3>${e(s.name)}</h3>
     <div class="muted small">${plural(s.episodes.length, 'new episode')} · latest ${e(timeAgo(s.latestAddedAt, now))}</div>
     <ul class="episodes">${s.episodes
-      .map((ep) => `<li><span class="chip">${ep.season != null ? `S${String(ep.season).padStart(2, '0')}` : ''}${ep.episode != null ? `E${String(ep.episode).padStart(2, '0')}` : ''}</span> ${e(ep.name)}</li>`)
+      .map((ep) => `<li><span class="chip">${ep.season != null ? `S${e(String(ep.season).padStart(2, '0'))}` : ''}${ep.episode != null ? `E${e(String(ep.episode).padStart(2, '0'))}` : ''}</span> ${e(ep.name)}</li>`)
       .join('')}</ul>
   </div>
 </article>`,

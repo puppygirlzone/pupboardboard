@@ -4,6 +4,7 @@ import { ROUTES, resolveRoute, SOURCES } from './views.js';
 import { greeting, timeAgo, formatClock, formatLongDate } from './format.js';
 import { preload, enter, refresh, pulse, leave, moveNavIndicator, initHoverEffects } from './motion.js';
 import { initThemeControls } from './theme-controls.js';
+import { initMenu } from './menu.js';
 import { initPuppyMode, isPuppy } from './puppy-mode.js';
 import { startBackdrop } from './backdrop.js';
 import { mergeNowPlaying, fetchNowPlaying } from './live.js';
@@ -195,6 +196,11 @@ async function boot() {
     initThemeControls();
   } catch (err) {
     console.warn('[dashboard] theme controls unavailable', err);
+  }
+  try {
+    initMenu();
+  } catch (err) {
+    console.warn('[dashboard] menu unavailable', err);
   }
   try {
     startBackdrop(document.querySelector('.dot-grid'));

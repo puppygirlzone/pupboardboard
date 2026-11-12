@@ -153,10 +153,11 @@ export function createSteamLoader({ config, fetchImpl, history, now = Date.now }
 
     const at = now();
     let snapshots = null;
-    if (values.owned) {
-      // Only snapshot from the full library, so totals are complete.
-      snapshots = await history.record(values.owned.totals, at);
-    }
+    // Only a live full-library result becomes a snapshot. If that call failed,
+    // settleAll hands back the previous totals: use history, don't record it again.
+    const ownedLive = values.owned && !warnings.some((w) => w.startsWith('owned:'));
+    if (ownedLive) snapshots = await history.record(values.owned.totals, at, id);
+    else if (values.owned) snapshots = await history.current(id);
     const data = buildSteamData({
       recent: values.recent ?? [],
       owned: values.owned ?? null,

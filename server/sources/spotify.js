@@ -31,6 +31,7 @@ export function createSpotifyAuth({ config, fetchImpl, file, now = Date.now, dem
   const pending = new Map(); // state -> { verifier, redirectUri, returnTo, at }
   let stored = null; // { clientId, refreshToken, connectedAt }
   let access = null; // { token, expiresAt }
+  let refreshing = null; // one refresh at a time: parallel callers share it
   const opts = () => ({ timeoutMs: config.timeoutMs });
 
   try {
@@ -43,7 +44,7 @@ export function createSpotifyAuth({ config, fetchImpl, file, now = Date.now, dem
   async function save(next) {
     stored = next;
     await mkdir(path.dirname(file), { recursive: true });
-    const tmp = `${file}.${process.pid}.tmp`;
+    const tmp = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
     await writeFile(tmp, JSON.stringify(next), { mode: 0o600 });
     await rename(tmp, file);
     await chmod(file, 0o600).catch(() => {});
@@ -120,19 +121,26 @@ export function createSpotifyAuth({ config, fetchImpl, file, now = Date.now, dem
       if (demo) return 'demo-token';
       if (!stored || stored.clientId !== config.spotify.clientId) throw new UpstreamError('Spotify is not connected');
       if (!force && access && access.expiresAt - 60_000 > now()) return access.token;
-      let json;
-      try {
-        json = await tokenRequest({ grant_type: 'refresh_token', refresh_token: stored.refreshToken, client_id: stored.clientId });
-      } catch (err) {
-        if (err.status === 400 || err.status === 401) throw new UpstreamError('Spotify sign-in expired: press "Connect Spotify" in Settings again', err.status);
-        throw err;
-      }
-      access = { token: json.access_token, expiresAt: now() + (Number(json.expires_in) || 3600) * 1000 };
-      // Spotify may rotate the refresh token; keep the newest.
-      if (typeof json.refresh_token === 'string' && json.refresh_token !== stored.refreshToken) {
-        await save({ ...stored, refreshToken: json.refresh_token }).catch((e) => console.warn(`[spotify] could not save token: ${e.code ?? e.message}`));
-      }
-      return access.token;
+      // Spotify rotates refresh tokens, so two refreshes racing with the same
+      // one can sign the user out. Everyone waits for the same refresh.
+      refreshing ??= (async () => {
+        let json;
+        try {
+          json = await tokenRequest({ grant_type: 'refresh_token', refresh_token: stored.refreshToken, client_id: stored.clientId });
+        } catch (err) {
+          if (err.status === 400 || err.status === 401) throw new UpstreamError('Spotify sign-in expired: press "Connect Spotify" in Settings again', err.status);
+          throw err;
+        }
+        access = { token: json.access_token, expiresAt: now() + (Number(json.expires_in) || 3600) * 1000 };
+        // Keep the newest refresh token.
+        if (typeof json.refresh_token === 'string' && json.refresh_token !== stored.refreshToken) {
+          await save({ ...stored, refreshToken: json.refresh_token }).catch((e) => console.warn(`[spotify] could not save token: ${e.code ?? e.message}`));
+        }
+        return access.token;
+      })().finally(() => {
+        refreshing = null;
+      });
+      return refreshing;
     },
   };
 }

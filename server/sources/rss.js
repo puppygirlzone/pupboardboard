@@ -103,14 +103,70 @@ export function decodeEntities(text) {
   });
 }
 
+// Feeds are untrusted and can be large, so everything below scans with
+// indexOf (linear time) instead of lazy [\s\S]*? regexes, which go quadratic
+// on unclosed tags and could block the server for minutes.
+export const MAX_ITEMS = 200;
+const MAX_BLOCK = 200_000;
+const isBoundary = (ch) => ch === undefined || ch === '>' || ch === '/' || /\s/.test(ch);
+
+/** Start of the next real <name ...> tag at or after `from` in `lower` (already lowercased), or -1. */
+function findOpen(lower, name, from) {
+  let at = lower.indexOf(`<${name}`, from);
+  while (at !== -1 && !isBoundary(lower[at + name.length + 1])) at = lower.indexOf(`<${name}`, at + 1);
+  return at;
+}
+
 /** Text content of the first <tag> (namespaced tags allowed), CDATA unwrapped. */
 export function tagText(block, tag) {
-  const name = tag.replace(':', '\\:');
-  const m = block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, 'i'));
-  if (!m) return null;
-  const inner = m[1].trim();
-  const cdata = inner.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/);
-  return cdata ? cdata[1] : decodeEntities(inner.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1'));
+  const lower = block.toLowerCase();
+  const name = tag.toLowerCase();
+  const open = findOpen(lower, name, 0);
+  if (open === -1) return null;
+  const gt = lower.indexOf('>', open);
+  if (gt === -1 || lower[gt - 1] === '/') return null; // unterminated or <tag/>
+  const close = lower.indexOf(`</${name}>`, gt + 1);
+  if (close === -1) return null;
+  const inner = block.slice(gt + 1, close).trim();
+  if (inner.startsWith('<![CDATA[') && inner.endsWith(']]>') && inner.indexOf(']]>') === inner.length - 3) return inner.slice(9, -3);
+  return decodeEntities(unwrapCdata(inner));
+}
+
+/** Replaces every <![CDATA[...]]> with its contents. */
+function unwrapCdata(text) {
+  let out = '';
+  let i = 0;
+  for (;;) {
+    const open = text.indexOf('<![CDATA[', i);
+    if (open === -1) return out + text.slice(i);
+    const close = text.indexOf(']]>', open + 9);
+    if (close === -1) return out + text.slice(i);
+    out += text.slice(i, open) + text.slice(open + 9, close);
+    i = close + 3;
+  }
+}
+
+/** The inside of each <item>/<entry> (or the given tags), in order. Capped in count and size. */
+export function itemBlocks(text, names = ['item', 'entry']) {
+  const lower = text.toLowerCase();
+  const blocks = [];
+  let from = 0;
+  while (blocks.length < MAX_ITEMS) {
+    let best = -1;
+    let bestName = null;
+    for (const n of names) {
+      const at = findOpen(lower, n, from);
+      if (at !== -1 && (best === -1 || at < best)) [best, bestName] = [at, n];
+    }
+    if (best === -1) break;
+    const gt = lower.indexOf('>', best);
+    if (gt === -1) break;
+    const close = lower.indexOf(`</${bestName}>`, gt + 1);
+    if (close === -1) break; // no more complete items
+    if (close - gt <= MAX_BLOCK) blocks.push(text.slice(gt + 1, close));
+    from = close + bestName.length + 3;
+  }
+  return blocks;
 }
 
 const firstText = (block, tags) => {
@@ -123,7 +179,23 @@ const firstText = (block, tags) => {
 
 // Real tags start with a letter ("<p", "</b"); "<45>" or "a < b" are text.
 const TAG = /<\/?[a-z][a-z0-9-]*(?:\s[^<>]*)?\/?>/gi;
-const stripTags = (s) => s.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, ' ').replace(TAG, ' ');
+function dropScripts(s) {
+  const lower = s.toLowerCase();
+  let out = '';
+  let i = 0;
+  for (;;) {
+    const a = findOpen(lower, 'script', i);
+    const b = findOpen(lower, 'style', i);
+    const at = a === -1 ? b : b === -1 ? a : Math.min(a, b);
+    if (at === -1) return out + s.slice(i);
+    const name = at === a ? 'script' : 'style';
+    const close = lower.indexOf(`</${name}>`, at);
+    out += `${s.slice(i, at)} `;
+    if (close === -1) return out; // unclosed: drop the rest
+    i = close + name.length + 3;
+  }
+}
+const stripTags = (s) => dropScripts(s).replace(TAG, ' ');
 
 /** HTML snippet -> short plain text. Handles feeds that escape HTML twice. */
 export function toPlainText(html, max = 220) {
@@ -159,8 +231,7 @@ export function parseFeed(xml) {
   const firstItemAt = text.search(/<(item|entry)\b/i);
   const header = firstItemAt === -1 ? text : text.slice(0, firstItemAt);
 
-  const items = [...text.matchAll(/<(item|entry)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((m) => {
-    const block = m[2];
+  const items = itemBlocks(text).map((block) => {
     const rawTitle = firstText(block, ['title']);
     const link = safeLink(tagText(block, 'link')) ?? safeLink(atomLink(block)) ?? safeLink(tagText(block, 'guid'));
     return {
