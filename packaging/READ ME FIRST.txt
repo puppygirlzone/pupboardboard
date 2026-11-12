@@ -24,8 +24,14 @@ window open while you use the dashboard. Closing it stops pupboard.
 SETTING IT UP
 
 The first time, your browser opens the Settings page. Fill in what you use
-(Steam, Navidrome, Jellyfin, news feeds) and press Save. Anything you skip
-just shows "Not set up".
+and press Save. Anything you skip just shows "Not set up".
+
+  - Game deals and gaming news work straight away, nothing to fill in.
+  - Spotify: the easy way is a free ListenBrainz account (listenbrainz.org).
+    Connect Spotify there, then type your ListenBrainz username in Settings.
+  - Letterboxd: just your username.
+  - Steam: paste your profile link, plus a free key from
+    steamcommunity.com/dev/apikey (the Settings page explains).
 
 To change settings later, start pupboard and click the gear button at the
 top right of the dashboard. For safety, the settings page only works in a

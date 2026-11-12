@@ -20,15 +20,47 @@ const ICONS = {
 ICONS.rss =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11a8 8 0 0 1 8 8M5 5a14 14 0 0 1 14 14" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round"/><circle cx="6" cy="18" r="1.8" fill="currentColor"/></svg>';
 
+ICONS.deals =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12.6V4.5A1.5 1.5 0 0 1 4.5 3h8.1a1.5 1.5 0 0 1 1.06.44l6.9 6.9a1.5 1.5 0 0 1 0 2.12l-8.1 8.1a1.5 1.5 0 0 1-2.12 0l-6.9-6.9A1.5 1.5 0 0 1 3 12.6Z" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linejoin="round"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/></svg>';
+ICONS.letterboxd =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="3.2" stroke="currentColor" stroke-width="1.7" fill="none"/><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.7" fill="none"/><circle cx="18" cy="12" r="3.2" stroke="currentColor" stroke-width="1.7" fill="none"/></svg>';
+ICONS.listenbrainz = ICONS.navidrome;
+ICONS.spotify = ICONS.navidrome;
+
+const SETTINGS_LINK = '<a href="/setup.html">Settings</a>';
+const ext = (href, text) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+
+// accent: which colour family the card uses (each card slot has one).
+// setup: fixed, trusted HTML shown when the source isn't set up yet.
 export const SOURCES = {
   steam: { title: 'Gaming', route: '#/gaming', env: 'STEAM_API_KEY and STEAM_ID' },
-  navidrome: { title: 'Music', route: '#/music', env: 'NAVIDROME_URL, NAVIDROME_USER and NAVIDROME_PASSWORD' },
-  jellyfin: { title: 'Media', route: '#/media', env: 'JELLYFIN_URL and JELLYFIN_API_KEY' },
+  navidrome: { title: 'Music', provider: 'Navidrome', route: '#/music', env: 'NAVIDROME_URL, NAVIDROME_USER and NAVIDROME_PASSWORD' },
+  listenbrainz: {
+    title: 'Music',
+    provider: 'ListenBrainz',
+    route: '#/music',
+    accent: 'navidrome',
+    env: 'LISTENBRAINZ_USER',
+    setup: `Free, no keys: make an account at ${ext('https://listenbrainz.org', 'listenbrainz.org')}, connect Spotify there (Settings → Music services), then add your username on the ${SETTINGS_LINK} page. Spotify direct and Navidrome work too.`,
+  },
+  spotify: {
+    title: 'Music',
+    provider: 'Spotify',
+    route: '#/music',
+    accent: 'navidrome',
+    env: 'SPOTIFY_CLIENT_ID',
+    setup: `Press “Connect Spotify” on the ${SETTINGS_LINK} page. Needs Spotify Premium and a free Spotify developer app; ListenBrainz is the no-setup alternative.`,
+  },
+  jellyfin: { title: 'Media', provider: 'Jellyfin', route: '#/media', env: 'JELLYFIN_URL and JELLYFIN_API_KEY' },
+  letterboxd: { title: 'Films', provider: 'Letterboxd', route: '#/media', accent: 'jellyfin', env: 'LETTERBOXD_USER', setup: `Add your Letterboxd username on the ${SETTINGS_LINK} page.` },
+  deals: { title: 'Game deals', route: '#/media', accent: 'jellyfin', env: 'DEALS', setup: `Game deals are turned off. Turn them on in ${SETTINGS_LINK}.` },
   rss: { title: 'News', route: '#/news', env: 'RSS_FEEDS', setup: 'Add feeds on the <a href="/setup.html">Settings</a> page, or to <code>config/feeds.txt</code>, one per line. No restart needed.' },
 };
 
 export const coverUrl = (id, size = 300) => (id ? `/api/img/navidrome/${encodeURIComponent(id)}?size=${size}` : '');
 export const posterUrl = (id, size = 360) => (id ? `/api/img/jellyfin/${encodeURIComponent(id)}?size=${size}` : '');
+/** Picture for a track or album: a direct https URL (Spotify, ListenBrainz) or Navidrome's proxied cover. */
+export const artUrl = (item, size = 300) => item?.art || coverUrl(item?.coverId, size);
 
 const img = (src, alt, cls) =>
   src
@@ -78,9 +110,10 @@ export function emptyState(key, env) {
 
 function cardShell(key, env, body, now) {
   const meta = SOURCES[key];
-  return `<article class="card card-${key}" data-anim>
+  const via = meta.provider && meta.accent ? ` <span class="via">${e(meta.provider)}</span>` : '';
+  return `<article class="card card-${meta.accent ?? key}" data-source="${key}" data-anim>
   <header class="card-head">
-    <a class="card-title" href="${meta.route}"><span class="icon">${ICONS[key]}</span>${e(meta.title)}</a>
+    <a class="card-title" href="${meta.route}"><span class="icon">${ICONS[key]}</span>${e(meta.title)}${via}</a>
     ${statusPill(env, now)}
   </header>
   <div class="card-body">${body}</div>
@@ -228,11 +261,13 @@ ${warningsNote(d)}`;
 }
 
 /* ----------------------------------------------------------------- Music */
+// One set of renderers for every music source (Navidrome, Spotify,
+// ListenBrainz): their loaders all produce the same shape.
 
 function nowPlayingBlock(np, large = false) {
   if (!np) return '';
   return `<div class="now-playing ${large ? 'now-playing-lg' : ''}" data-anim>
-  ${img(coverUrl(np.coverId, large ? 400 : 160), np.album || np.title, 'cover')}
+  ${img(artUrl(np, large ? 400 : 160), np.album || np.title, 'cover')}
   <div class="np-text">
     <div class="np-label"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Now playing${np.user ? ` · ${e(np.user)}` : ''}</div>
     <div class="np-title">${e(np.title)}</div>
@@ -246,7 +281,7 @@ function trackRows(tracks, limit, now) {
     .slice(0, limit)
     .map(
       (t) => `<li class="row" data-anim>
-  ${img(coverUrl(t.coverId, 96), t.album, 'thumb')}
+  ${img(artUrl(t, 96), t.album, 'thumb')}
   <div class="row-main"><div class="row-title">${e(t.title)}</div><div class="muted small">${e(t.artist)}</div></div>
   <div class="row-value muted small">${e(timeAgo(t.playDate, now))}</div>
 </li>`,
@@ -254,21 +289,35 @@ function trackRows(tracks, limit, now) {
     .join('');
 }
 
-export function navidromeGlance(env, now = Date.now()) {
-  const d = env?.data;
-  if (!d) return cardShell('navidrome', env, emptyState('navidrome', env), now);
+/** Week numbers for a music source; "—" when unknown, "50+" when the source only shares part of the week. */
+function musicNumbers(d) {
   const s = d.stats ?? {};
-  const known = d.hasSongHistory !== false; // false when Navidrome's history call failed
+  const known = d.hasSongHistory !== false; // false when the history call failed
+  const tracks = !known
+    ? '—'
+    : s.capped
+      ? `${e(s.tracksThisWeek)}+`
+      : count(s.tracksThisWeek, String(s.tracksThisWeek ?? 0));
+  const minutes = !known || s.minutesKnown === false ? '—' : count(toHours(s.minutesThisWeek), `${toHours(s.minutesThisWeek)}h`, { decimals: 1, suffix: 'h' });
+  const atLeast = s.exact && !s.capped ? 'this week' : 'at least';
+  return { s, known, tracks, minutes, atLeast };
+}
+
+export function musicGlance(key, env, now = Date.now()) {
+  const d = env?.data;
+  if (!d) return cardShell(key, env, emptyState(key, env), now);
+  const { s, tracks, minutes, atLeast } = musicNumbers(d);
   const top = s.topArtists?.[0];
   const body = `${nowPlayingBlock(d.nowPlaying?.[0])}
 <div class="stats">
-  ${stat('Tracks this week', known ? count(s.tracksThisWeek, String(s.tracksThisWeek ?? 0)) : '—')}
-  ${stat('Listening time', known ? count(toHours(s.minutesThisWeek), `${toHours(s.minutesThisWeek)}h`, { decimals: 1, suffix: 'h' }) : '—', 'at least')}
+  ${stat('Tracks this week', tracks)}
+  ${stat('Listening time', minutes, s.minutesKnown === false ? 'track lengths unknown' : atLeast)}
 </div>
 ${top ? `<p class="highlight" data-anim>Top artist: <strong>${e(top.name)}</strong> <span class="muted">(${plural(top.plays, 'track')})</span></p>` : ''}
 ${d.recentlyPlayed?.length ? `<ul class="rows">${trackRows(d.recentlyPlayed, 4, now)}</ul>` : `<p class="muted" data-anim>${d.hasSongHistory ? 'Nothing played recently.' : 'Play history unavailable.'}</p>`}`;
-  return cardShell('navidrome', env, body, now);
+  return cardShell(key, env, body, now);
 }
+export const navidromeGlance = (env, now) => musicGlance('navidrome', env, now);
 
 function rankList(items, labelFn, cls) {
   if (!items?.length) return '<p class="muted">Nothing yet this week.</p>';
@@ -280,51 +329,54 @@ function rankList(items, labelFn, cls) {
     .join('')}</ol>`;
 }
 
-export function navidromeDetail(env, now = Date.now()) {
+export function musicDetail(key, env, now = Date.now()) {
   const d = env?.data;
-  const head = pageHead('navidrome', 'Music', env, now);
-  if (!d) return head + emptyState('navidrome', env);
-  const s = d.stats ?? {};
-  const known = d.hasSongHistory !== false;
+  const head = pageHead(key, 'Music', env, now);
+  if (!d) return head + emptyState(key, env);
+  const { s, known, tracks, minutes, atLeast } = musicNumbers(d);
   const nowPlaying = (d.nowPlaying ?? []).map((np) => nowPlayingBlock(np, true)).join('');
   const albumGrid = (albums) =>
     albums?.length
       ? `<div class="tiles">${albums
           .map(
-            (a) => `<figure class="tile" data-anim>${img(coverUrl(a.coverId, 300), a.name, 'tile-art')}<figcaption><div class="row-title">${e(a.name)}</div><div class="muted small">${e(a.artist)}${a.playCount ? ` · ${plural(a.playCount, 'play')}` : ''}</div></figcaption></figure>`,
+            (a) => `<figure class="tile" data-anim>${img(artUrl(a, 300), a.name, 'tile-art')}<figcaption><div class="row-title">${e(a.name)}</div><div class="muted small">${e(a.artist)}${a.playCount ? ` · ${plural(a.playCount, 'play')}` : ''}</div></figcaption></figure>`,
           )
           .join('')}</div>`
       : '<p class="muted">No albums yet.</p>';
   const topSongs = d.topSongs?.length
     ? `<ol class="table">${d.topSongs
         .map(
-          (t, i) => `<li data-anim><span class="num">${i + 1}</span><div class="row-main"><div class="row-title">${e(t.title)}</div><div class="muted small">${e(t.artist)} — ${e(t.album)}</div></div><span class="muted small">${formatDuration(t.duration)}</span><span class="row-value">${plural(t.playCount, 'play')}</span></li>`,
+          (t, i) => `<li data-anim><span class="num">${i + 1}</span><div class="row-main"><div class="row-title">${e(t.title)}</div><div class="muted small">${e(t.artist)}${t.album ? ` — ${e(t.album)}` : ''}</div></div><span class="muted small">${t.duration ? formatDuration(t.duration) : ''}</span><span class="row-value">${t.playCount ? plural(t.playCount, 'play') : ''}</span></li>`,
         )
         .join('')}</ol>`
-    : '<p class="muted">No play counts yet.</p>';
+    : '<p class="muted">Nothing here yet.</p>';
+  const genres = d.hasGenres !== false;
+  const note = d.note ?? 'Navidrome stores only the latest play of each song, so weekly counts are a minimum.';
+  const profile = typeof d.profileUrl === 'string' && /^https:\/\//.test(d.profileUrl) ? ` ${ext(e(d.profileUrl), `Open your ${e(d.provider ?? 'profile')} page`)}.` : '';
 
   return `${head}
 ${nowPlaying}
 <section class="stats stats-wide">
-  ${stat('Tracks this week', known ? count(s.tracksThisWeek, String(s.tracksThisWeek ?? 0)) : '—')}
-  ${stat('Listening time', known ? count(toHours(s.minutesThisWeek), `${toHours(s.minutesThisWeek)}h`, { decimals: 1, suffix: 'h' }) : '—', 'at least, this week')}
+  ${stat('Tracks this week', tracks)}
+  ${stat('Listening time', minutes, s.minutesKnown === false ? 'track lengths unknown' : atLeast)}
   ${stat('Artists this week', known ? count(s.topArtists?.length ?? 0, String(s.topArtists?.length ?? 0)) : '—', 'top 5 shown')}
-  ${stat('Top genre', e(s.topGenres?.[0]?.name ?? '—'))}
+  ${genres ? stat('Top genre', e(s.topGenres?.[0]?.name ?? '—')) : stat('Top album', e(s.topAlbums?.[0]?.name || '—'))}
 </section>
 <div class="columns">
   <section class="panel" data-anim><h2>Top artists this week</h2>${rankList(s.topArtists, (a) => e(a.name), 'bar-music')}</section>
   <section class="panel" data-anim><h2>Top albums this week</h2>${rankList(s.topAlbums, (a) => `${e(a.name)} <span class="muted small">${e(a.artist)}</span>`, 'bar-music')}</section>
-  <section class="panel" data-anim><h2>Top genres this week</h2>${rankList(s.topGenres, (g) => e(g.name), 'bar-music')}</section>
+  ${genres ? `<section class="panel" data-anim><h2>Top genres this week</h2>${rankList(s.topGenres, (g) => e(g.name), 'bar-music')}</section>` : ''}
 </div>
 <div class="columns columns-2">
   <section class="panel" data-anim><h2>Recently played</h2>${d.recentlyPlayed?.length ? `<ul class="rows">${trackRows(d.recentlyPlayed, 15, now)}</ul>` : '<p class="muted">No history available.</p>'}</section>
-  <section class="panel" data-anim><h2>Most played songs (all time)</h2>${topSongs}</section>
+  <section class="panel" data-anim><h2>${e(d.topSongsLabel ?? 'Most played songs (all time)')}</h2>${topSongs}</section>
 </div>
-<section class="panel" data-anim><h2>Recently played albums</h2>${albumGrid(d.recentAlbums)}</section>
-<section class="panel" data-anim><h2>Most played albums</h2>${albumGrid(d.frequentAlbums)}</section>
-<p class="note" data-anim>Navidrome stores only the latest play of each song, so weekly counts are a minimum.</p>
+${Array.isArray(d.recentAlbums) ? `<section class="panel" data-anim><h2>Recently played albums</h2>${albumGrid(d.recentAlbums)}</section>` : ''}
+${Array.isArray(d.frequentAlbums) ? `<section class="panel" data-anim><h2>Most played albums</h2>${albumGrid(d.frequentAlbums)}</section>` : ''}
+<p class="note" data-anim>${e(note)}${profile}</p>
 ${warningsNote(d)}`;
 }
+export const navidromeDetail = (env, now) => musicDetail('navidrome', env, now);
 
 /* ----------------------------------------------------------------- Media */
 
@@ -400,6 +452,123 @@ ${shows ? `<section class="media-grid">${shows}</section>` : '<p class="muted" d
 ${warningsNote(d)}`;
 }
 
+/* ----------------------------------------------------------- Game deals */
+
+const price = (n) => (Number.isFinite(n) ? `$${n.toFixed(2)}` : '');
+const until = (iso, now) => {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return 'while it lasts';
+  const days = Math.ceil((t - now) / 86_400_000);
+  return days <= 0 ? 'ends today' : days === 1 ? 'ends tomorrow' : `${days} days left`;
+};
+const dealsCredit = `<p class="note" data-anim>Free games from ${ext('https://www.gamerpower.com', 'GamerPower')}, Steam sales from ${ext('https://www.cheapshark.com', 'CheapShark')} (US prices).</p>`;
+
+function freebieRow(g, now) {
+  const title = g.url ? `<a href="${e(g.url)}" target="_blank" rel="noopener noreferrer">${e(g.title)}</a>` : e(g.title);
+  return `<li class="row" data-anim>
+  ${img(g.image, g.title, 'thumb thumb-game')}
+  <div class="row-main"><div class="row-title">${title}</div><div class="muted small">${e(g.store)} · ${e(until(g.endsAt, now))}</div></div>
+  <div class="row-value">${g.worth ? `<s class="muted small">${e(price(g.worth))}</s> ` : ''}Free</div>
+</li>`;
+}
+
+function dealRow(d) {
+  return `<li class="row" data-anim>
+  ${img(d.image, d.title, 'thumb thumb-game')}
+  <div class="row-main"><div class="row-title"><a href="${e(d.url)}" target="_blank" rel="noopener noreferrer">${e(d.title)}</a></div><div class="muted small">${d.normalPrice ? `<s>${e(price(d.normalPrice))}</s> ` : ''}${e(price(d.price))}${d.rating ? ` · ${d.rating}% positive` : ''}</div></div>
+  <div class="row-value"><span class="pill pill-ok">-${e(d.savings)}%</span></div>
+</li>`;
+}
+
+export function dealsGlance(env, now = Date.now()) {
+  const d = env?.data;
+  if (!d) return cardShell('deals', env, emptyState('deals', env), now);
+  const free = d.freebies ?? [];
+  const deals = d.deals ?? [];
+  const rows = [...free.slice(0, 2).map((g) => freebieRow(g, now)), ...deals.slice(0, 4 - Math.min(free.length, 2)).map(dealRow)].join('');
+  const body = `<div class="stats">
+  ${stat('Free right now', d.hasFreebies === false ? '—' : count(free.length, String(free.length)), d.freeWorth ? `worth ${price(d.freeWorth)}` : 'PC games to keep')}
+  ${stat('Best Steam sale', d.hasDeals === false || !d.bestSaving ? '—' : `-${count(d.bestSaving, String(d.bestSaving), { suffix: '%' })}`, 'off right now')}
+</div>
+${rows ? `<ul class="rows">${rows}</ul>` : '<p class="muted" data-anim>No deals right now.</p>'}`;
+  return cardShell('deals', env, body, now);
+}
+
+export function dealsDetail(env, now = Date.now()) {
+  const d = env?.data;
+  const head = pageHead('deals', 'Game deals', env, now);
+  if (!d) return head + emptyState('deals', env);
+  const free = d.freebies ?? [];
+  const deals = d.deals ?? [];
+  return `${head}
+<section class="stats stats-wide">
+  ${stat('Free right now', d.hasFreebies === false ? '—' : count(free.length, String(free.length)), 'PC games to keep')}
+  ${stat('Total worth', d.hasFreebies === false || !d.freeWorth ? '—' : e(price(d.freeWorth)), 'if you grabbed them all')}
+  ${stat('Steam sales', d.hasDeals === false ? '—' : count(deals.length, String(deals.length)), 'top rated deals')}
+  ${stat('Best discount', d.hasDeals === false || !d.bestSaving ? '—' : `-${count(d.bestSaving, String(d.bestSaving), { suffix: '%' })}`)}
+</section>
+<div class="columns columns-2">
+  <section class="panel" data-anim><h2>Free to keep</h2>${free.length ? `<ul class="rows">${free.map((g) => freebieRow(g, now)).join('')}</ul>` : `<p class="muted">${d.hasFreebies === false ? "Couldn't check for free games right now." : 'No free games right now. Check back soon.'}</p>`}</section>
+  <section class="panel" data-anim><h2>Best Steam sales</h2>${deals.length ? `<ul class="rows">${deals.map(dealRow).join('')}</ul>` : `<p class="muted">${d.hasDeals === false ? "Couldn't load Steam sales right now." : 'No big sales right now.'}</p>`}</section>
+</div>
+${dealsCredit}
+${warningsNote(d)}`;
+}
+
+/* ----------------------------------------------------------- Letterboxd */
+
+/** 3.5 -> "★★★½" */
+export function stars(rating) {
+  const r = Number(rating);
+  if (!Number.isFinite(r) || r <= 0) return '';
+  const whole = Math.floor(Math.min(r, 5));
+  return '★'.repeat(whole) + (r - whole >= 0.5 ? '½' : '');
+}
+
+function filmMeta(f, now) {
+  return [f.year, stars(f.rating), f.liked ? '♥' : '', f.rewatch ? 'rewatch' : '', f.watchedDate ? timeAgo(`${f.watchedDate}T12:00:00Z`, now) : ''].filter(Boolean).join(' · ');
+}
+
+export function letterboxdGlance(env, now = Date.now()) {
+  const d = env?.data;
+  if (!d) return cardShell('letterboxd', env, emptyState('letterboxd', env), now);
+  const st = d.stats ?? {};
+  const posters = (d.films ?? [])
+    .slice(0, 5)
+    .map((f) => `<figure class="poster" data-anim>${img(f.poster, f.title, 'poster-art')}<figcaption><div class="row-title">${e(f.title)}</div><div class="muted small">${e(stars(f.rating) || String(f.year ?? ''))}</div></figcaption></figure>`)
+    .join('');
+  const body = `<div class="stats">
+  ${stat('Films this week', count(st.thisWeek ?? 0, String(st.thisWeek ?? 0)))}
+  ${stat('This month', count(st.thisMonth ?? 0, String(st.thisMonth ?? 0)) + (d.capped ? '+' : ''), st.averageRating ? `average ${stars(st.averageRating)}` : 'last 30 days')}
+</div>
+${posters ? `<div class="poster-strip">${posters}</div>` : '<p class="muted" data-anim>No films logged yet.</p>'}`;
+  return cardShell('letterboxd', env, body, now);
+}
+
+export function letterboxdDetail(env, now = Date.now()) {
+  const d = env?.data;
+  const head = pageHead('letterboxd', 'Films', env, now);
+  if (!d) return head + emptyState('letterboxd', env);
+  const st = d.stats ?? {};
+  const films = (d.films ?? [])
+    .map((f) => {
+      const title = f.link ? `<a href="${e(f.link)}" target="_blank" rel="noopener noreferrer">${e(f.title)}</a>` : e(f.title);
+      return `<figure class="tile" data-anim>${img(f.poster, f.title, 'tile-art tile-poster')}<figcaption><div class="row-title">${title}</div><div class="muted small">${e(filmMeta(f, now))}</div></figcaption></figure>`;
+    })
+    .join('');
+  const profile = typeof d.profileUrl === 'string' && /^https:\/\//.test(d.profileUrl) ? ext(e(d.profileUrl), 'your Letterboxd profile') : 'Letterboxd';
+  return `${head}
+<section class="stats stats-wide">
+  ${stat('Films this week', count(st.thisWeek ?? 0, String(st.thisWeek ?? 0)))}
+  ${stat('Films this month', count(st.thisMonth ?? 0, String(st.thisMonth ?? 0)) + (d.capped ? '+' : ''), 'last 30 days')}
+  ${stat('Average rating', st.averageRating ? `${e(st.averageRating)} <span class="muted small">${e(stars(st.averageRating))}</span>` : '—', 'of rated films')}
+  ${stat('Liked', count(st.liked ?? 0, String(st.liked ?? 0)), 'recent films')}
+</section>
+<section class="panel" data-anim><h2>Recently watched</h2>${films ? `<div class="tiles">${films}</div>` : '<p class="muted">No films logged yet.</p>'}</section>
+<p class="note" data-anim>From the public diary on ${profile}. Letterboxd's feed holds about your last 50 entries.</p>
+${warningsNote(d)}`;
+}
+
 /* ------------------------------------------------------------------ News */
 
 /** Only http(s) links are ever rendered as links. */
@@ -463,9 +632,11 @@ ${warningsNote(d)}`;
 /* ---------------------------------------------------------------- Shared */
 
 function pageHead(key, title, env, now) {
+  const meta = SOURCES[key];
+  const via = meta?.provider && meta.accent ? ` <span class="via">${e(meta.provider)}</span>` : '';
   return `<header class="page-head" data-anim>
   <a class="back" href="#/">← Overview</a>
-  <h1><span class="icon icon-${key}">${ICONS[key]}</span>${e(title)}</h1>
+  <h1><span class="icon icon-${meta?.accent ?? key}">${ICONS[key]}</span>${e(title)}${via}</h1>
   ${statusPill(env, now)}
 </header>`;
 }
@@ -475,11 +646,38 @@ function warningsNote(d) {
   return `<details class="warnings" data-anim><summary>Some data couldn't be loaded (${d.warnings.length})</summary><ul>${d.warnings.map((w) => `<li>${e(w)}</li>`).join('')}</ul></details>`;
 }
 
+const GLANCE = {
+  navidrome: (env, now) => musicGlance('navidrome', env, now),
+  spotify: (env, now) => musicGlance('spotify', env, now),
+  listenbrainz: (env, now) => musicGlance('listenbrainz', env, now),
+  jellyfin: jellyfinGlance,
+  letterboxd: letterboxdGlance,
+  deals: dealsGlance,
+};
+const DETAIL = {
+  navidrome: (env, now) => musicDetail('navidrome', env, now),
+  spotify: (env, now) => musicDetail('spotify', env, now),
+  listenbrainz: (env, now) => musicDetail('listenbrainz', env, now),
+  jellyfin: jellyfinDetail,
+  letterboxd: letterboxdDetail,
+  deals: dealsDetail,
+};
+
+/** Which source fills the Music and Media cards (sent by the server; older saved copies have none). */
+export function slotsOf(summary) {
+  const slots = summary?.slots ?? {};
+  return {
+    music: ['navidrome', 'spotify', 'listenbrainz'].includes(slots.music) ? slots.music : 'navidrome',
+    media: ['jellyfin', 'letterboxd', 'deals'].includes(slots.media) ? slots.media : 'jellyfin',
+  };
+}
+
 export function overview(summary, now = Date.now()) {
+  const slots = slotsOf(summary);
   return `<section class="grid">
 ${steamGlance(summary?.steam, now)}
-${navidromeGlance(summary?.navidrome, now)}
-${jellyfinGlance(summary?.jellyfin, now)}
+${GLANCE[slots.music](summary?.[slots.music], now)}
+${GLANCE[slots.media](summary?.[slots.media], now)}
 ${rssGlance(summary?.rss, now)}
 </section>`;
 }
@@ -488,8 +686,8 @@ ${rssGlance(summary?.rss, now)}
 export const ROUTES = {
   '': { key: null, render: (s, now) => overview(s, now) },
   gaming: { key: 'steam', render: (s, now) => steamDetail(s?.steam, now) },
-  music: { key: 'navidrome', render: (s, now) => navidromeDetail(s?.navidrome, now) },
-  media: { key: 'jellyfin', render: (s, now) => jellyfinDetail(s?.jellyfin, now) },
+  music: { key: 'navidrome', render: (s, now) => DETAIL[slotsOf(s).music](s?.[slotsOf(s).music], now) },
+  media: { key: 'jellyfin', render: (s, now) => DETAIL[slotsOf(s).media](s?.[slotsOf(s).media], now) },
   news: { key: 'rss', render: (s, now) => rssDetail(s?.rss, now) },
 };
 

@@ -6,7 +6,7 @@ import { timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isConfigured, loadConfig } from './config.js';
+import { isConfigured, loadConfig, resolveSlots } from './config.js';
 import { readSettings, writeSettings, mergeSettings, describeSettings, applyChanges, MAX_FEEDS_TEXT } from './settings.js';
 import { createCachedSource, hostOf, safeMessage } from './resilience.js';
 import { createSteamLoader } from './sources/steam.js';
@@ -14,6 +14,10 @@ import { createSteamHistory } from './sources/steam-history.js';
 import { createNavidromeLoader, createNowPlayingFetcher, navidromeCoverUrl } from './sources/navidrome.js';
 import { createJellyfinLoader, jellyfinImageUrl, jellyfinHeaders } from './sources/jellyfin.js';
 import { createRssLoader } from './sources/rss.js';
+import { createListenBrainzLoader } from './sources/listenbrainz.js';
+import { createSpotifyAuth, createSpotifyLoader } from './sources/spotify.js';
+import { createDealsLoader } from './sources/deals.js';
+import { createLetterboxdLoader } from './sources/letterboxd.js';
 import { demoArtSvg } from './demo/fake-upstreams.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -95,13 +99,25 @@ function readBody(req, limit) {
  * setup (optional): { code, env, file } enables the /setup page's API.
  *   code: secret printed at startup; env: the real environment; file: settings.json path.
  */
+const activeNames = (slots) => [...new Set(['steam', slots.music, slots.media, 'rss'])];
+
 export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, retryDelayMs = 300, summaryBudgetMs = 4000, setup = null }) {
+  // Callers (tests, older configs) may leave out the newer sections: fill in defaults.
+  const defaults = loadConfig({ RSS_FEEDS: 'off' });
+  for (const key of ['listenbrainz', 'spotify', 'letterboxd', 'deals', 'slots']) config[key] ??= defaults[key];
   const history = createSteamHistory({ dataDir: config.dataDir, fileName: config.demo ? 'steam-history.demo.json' : 'steam-history.json' });
   const common = { config, fetchImpl, now };
+  // Lives across rebuilds so a sign-in in progress survives a settings save.
+  const spotifyAuth = createSpotifyAuth({ config, fetchImpl, now, file: path.join(config.dataDir, 'spotify.json'), demo: config.demo });
   let sources;
   let nowPlaying;
+  let lb;
+  let letterboxd;
+  const cached = (name, load, extra = {}) =>
+    createCachedSource({ name, ttlMs: config[name].ttlMs, isConfigured: () => isConfigured[name](config), load, now, retryDelayMs, ...extra });
   // Built again when the setup page saves new settings.
   const build = () => {
+    config.spotify.isConnected = spotifyAuth.isConnected;
     sources = {
       steam: createCachedSource({
         name: 'steam',
@@ -136,7 +152,16 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
         now,
         retryDelayMs,
       }),
+      listenbrainz: cached('listenbrainz', (...a) => lb(...a)),
+      spotify: cached('spotify', createSpotifyLoader({ ...common, auth: spotifyAuth })),
+      letterboxd: cached('letterboxd', (...a) => letterboxd(...a)),
+      deals: cached('deals', createDealsLoader(common)),
     };
+    // Username-based loaders read the name when created, so only make them when set.
+    const lbLoad = config.listenbrainz.user ? createListenBrainzLoader(common) : null;
+    const lboxdLoad = config.letterboxd.user ? createLetterboxdLoader(common) : null;
+    lb = () => lbLoad();
+    letterboxd = () => lboxdLoad();
     nowPlaying = createNowPlayingFetcher({ config, fetchImpl });
   };
   build();
@@ -180,10 +205,75 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
     }
   }
 
-  async function handleSetup(req, res) {
+  const portOf = (req) => {
+    try {
+      return new URL(`http://${req.headers.host}`).port || '80';
+    } catch {
+      return String(config.port);
+    }
+  };
+  // Spotify only allows http redirects to 127.0.0.1 (never "localhost").
+  const spotifyRedirect = (req) => `http://127.0.0.1:${portOf(req)}/api/spotify/callback`;
+
+  /** Shared checks for POSTs from the setup page. Returns the parsed body, or null after answering. */
+  async function setupPostBody(req, res) {
     const refused = setupRefusal(req, { config, setup });
-    if (refused) return sendJson(res, 403, { error: refused });
+    if (refused) return sendJson(res, 403, { error: refused }), null;
+    if (req.method !== 'POST') return send(res, 405, 'method not allowed'), null;
+    if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return sendJson(res, 415, { error: 'expected JSON' }), null;
+    const origin = req.headers.origin;
+    if (origin && origin !== `http://${req.headers.host}`) return sendJson(res, 403, { error: 'not-local' }), null;
+    try {
+      return JSON.parse((await readBody(req, MAX_SETUP_BODY)) || '{}') ?? {};
+    } catch (err) {
+      return sendJson(res, err.status ?? 400, { error: err.status === 413 ? 'too large' : 'invalid JSON' }), null;
+    }
+  }
+
+  async function handleSpotify(req, res, p, url) {
+    if (p === '/api/spotify/callback') {
+      // Spotify sends the browser here; the one-time state proves it started from our setup page.
+      if (req.method !== 'GET') return send(res, 405, 'method not allowed');
+      if (!LOOPBACK_ADDRS.has(req.socket.remoteAddress)) return send(res, 403, 'forbidden', { 'content-type': 'text/plain' });
+      const state = url.searchParams.get('state');
+      const back = spotifyAuth.returnFor(state);
+      const goBack = (result) => send(res, 302, '', { location: `${back}?spotify=${result}`, 'cache-control': 'no-store' });
+      if (!back) return send(res, 400, 'This sign-in link expired or was already used. Go back to the pupboard Settings page and press "Connect Spotify" again.', { 'content-type': 'text/plain; charset=utf-8' });
+      if (url.searchParams.get('error')) {
+        spotifyAuth.cancelLogin(state);
+        return goBack('denied');
+      }
+      try {
+        await spotifyAuth.finishLogin({ state, code: url.searchParams.get('code') });
+        console.log('[spotify] connected');
+        warm().catch(() => {});
+        return goBack('connected');
+      } catch (err) {
+        console.warn(`[spotify] sign-in failed: ${safeMessage(err)}`);
+        return goBack('error');
+      }
+    }
+    const body = await setupPostBody(req, res);
+    if (!body) return;
+    if (p === '/api/spotify/login') {
+      try {
+        const authorizeUrl = spotifyAuth.startLogin({ redirectUri: spotifyRedirect(req), returnTo: `http://${req.headers.host}/setup.html` });
+        return sendJson(res, 200, { url: authorizeUrl });
+      } catch (err) {
+        return sendJson(res, 400, { error: safeMessage(err) });
+      }
+    }
+    if (p === '/api/spotify/disconnect') {
+      await spotifyAuth.disconnect().catch(() => {});
+      return sendJson(res, 200, { ok: true });
+    }
+    return sendJson(res, 404, { error: 'not found' });
+  }
+
+  async function handleSetup(req, res) {
     if (req.method === 'GET') {
+      const refused = setupRefusal(req, { config, setup });
+      if (refused) return sendJson(res, 403, { error: refused });
       const saved = readSettings(setup.file);
       const feedsText = await readFeedsText();
       // No feeds file yet: show the list in use (defaults or RSS_FEEDS) so it can be edited.
@@ -192,18 +282,12 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
         fields: describeSettings(setup.env, saved),
         feeds: { text: feedsText ?? current, exists: feedsText !== null },
         host: config.host,
+        spotify: { connected: spotifyAuth.isConnected(), connectedAt: spotifyAuth.connectedAt(), redirectUri: spotifyRedirect(req) },
+        slots: resolveSlots(config),
       });
     }
-    if (req.method !== 'POST') return send(res, 405, 'method not allowed');
-    if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return sendJson(res, 415, { error: 'expected JSON' });
-    const origin = req.headers.origin;
-    if (origin && origin !== `http://${req.headers.host}`) return sendJson(res, 403, { error: 'not-local' });
-    let body;
-    try {
-      body = JSON.parse(await readBody(req, MAX_SETUP_BODY));
-    } catch (err) {
-      return sendJson(res, err.status ?? 400, { error: err.status === 413 ? 'too large' : 'invalid JSON' });
-    }
+    const body = await setupPostBody(req, res);
+    if (!body) return;
     const { settings, errors } = applyChanges(readSettings(setup.file), body, setup.env);
     const feeds = body?.feeds;
     if (feeds !== undefined && (typeof feeds !== 'string' || feeds.length > MAX_FEEDS_TEXT)) errors.push({ key: 'feeds', message: 'The feed list is too long' });
@@ -231,6 +315,7 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
     const url = new URL(req.url, 'http://localhost');
     const p = url.pathname;
     if (p === '/api/setup') return handleSetup(req, res);
+    if (p.startsWith('/api/spotify/')) return handleSpotify(req, res, p, url);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed');
 
     if (p === '/api/display') {
@@ -253,9 +338,11 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
         });
         return Promise.race([src.get(), fallback]).finally(() => clearTimeout(timer));
       };
-      const names = Object.keys(sources);
+      // Only the sources on screen: the chosen Music and Media ones, plus Gaming and News.
+      const slots = resolveSlots(config);
+      const names = activeNames(slots);
       const envelopes = await Promise.all(names.map((n) => withBudget(sources[n])));
-      return sendJson(res, 200, { generatedAt: new Date(now()).toISOString(), demo: config.demo, ...Object.fromEntries(names.map((n, i) => [n, envelopes[i]])) });
+      return sendJson(res, 200, { generatedAt: new Date(now()).toISOString(), demo: config.demo, slots, ...Object.fromEntries(names.map((n, i) => [n, envelopes[i]])) });
     }
     // Live now-playing (no cache). Always 200; the page keeps what it has
     // if this fails.
@@ -268,8 +355,8 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
         return sendJson(res, 200, { status: 'error', nowPlaying: null, error: safeMessage(err) });
       }
     }
-    const sourceMatch = p.match(/^\/api\/(steam|navidrome|jellyfin|rss)$/);
-    if (sourceMatch) return sendJson(res, 200, await sources[sourceMatch[1]].get());
+    const sourceMatch = p.match(/^\/api\/([a-z]+)$/);
+    if (sourceMatch && Object.hasOwn(sources, sourceMatch[1])) return sendJson(res, 200, await sources[sourceMatch[1]].get());
 
     const img = p.match(/^\/api\/img\/(navidrome|jellyfin)\/([^/]+)$/);
     if (img) {
@@ -311,8 +398,8 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
     });
   });
 
-  /** Refresh every source (keeps caches warm and Steam history ticking). */
-  const warm = () => Promise.all(Object.values(sources).map((s) => s.get()));
+  /** Refresh the sources on screen (keeps caches warm and Steam history ticking). */
+  const warm = () => Promise.all(activeNames(resolveSlots(config)).map((n) => sources[n].get()));
 
   return {
     server,

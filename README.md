@@ -7,11 +7,13 @@
 A colourful, animated homepage that shows your week at a glance:
 
 - **Gaming (Steam):** hours played and which games, over the last 7 days
-- **Music (Navidrome):** now playing, tracks and listening time this week, top artists, albums and genres, most-played songs
-- **Media (Jellyfin):** movies and episodes added recently, library counts
-- **News (RSS/Atom):** the latest stories from your feeds, with a page per feed
+- **Music:** now playing, tracks and listening time this week, top artists and songs, from **Spotify** (via ListenBrainz, or directly) or your own **Navidrome**
+- **Media:** free games and the best Steam sales (works for everyone, no setup), films you've watched on **Letterboxd**, or what's new on your **Jellyfin** server
+- **News:** gaming news by default (Steam, GamingOnLinux, game deals, Rock Paper Shotgun), or any RSS/Atom feeds you like
 
-The overview page is the at-a-glance view. Click a card (or use the top nav) for a detail page with more. Use whichever sources you have; the rest just say "Not set up".
+The overview page is the at-a-glance view. Click a card (or use the top nav) for a detail page with more.
+
+**As few keys as possible.** Game deals and news work with no setup at all. Spotify (through ListenBrainz) and Letterboxd only need a username. Only Steam needs a (free) key, because Steam doesn't share playtime any other way.
 
 Everything it talks to is free: no paid APIs, no accounts with us, no tracking. Your keys and passwords stay on your machine.
 
@@ -86,16 +88,35 @@ npm run demo
 
 Demo mode shows made-up data and deliberately fails about 25% of requests, so you can see how the dashboard copes.
 
-## Getting the keys
+## Connecting your stuff
 
-| Source | Settings | Where to get them |
+Everything below can be filled in on the **Settings** page (gear button, top right) or in `.env`.
+
+| Card | Service | What you need |
 |---|---|---|
-| Steam | `STEAM_API_KEY`, `STEAM_ID` | Key: <https://steamcommunity.com/dev/apikey> (any domain name works). ID: your 17-digit SteamID64, e.g. from <https://steamid.io>. Set your Steam profile's **Game details** privacy to Public. |
-| Navidrome | `NAVIDROME_URL`, `NAVIDROME_USER`, `NAVIDROME_PASSWORD` | Your normal Navidrome address and login. |
-| Jellyfin | `JELLYFIN_URL`, `JELLYFIN_API_KEY` | Jellyfin Dashboard → API Keys → **+** |
-| News | `config/feeds.txt` (optional) | One RSS or Atom feed per line. See [News feeds](#news-feeds). |
+| Gaming | Steam | Your **profile link** and a free key from <https://steamcommunity.com/dev/apikey> (any domain name works). Set your Steam profile's **Game details** privacy to Public. |
+| Music | Spotify via [ListenBrainz](https://listenbrainz.org) | **Just a username.** Make a free ListenBrainz account, connect Spotify there (Settings → Music services), and it records your plays. Also works with YouTube Music, Jellyfin, Plex and others that ListenBrainz supports. |
+| Music | Spotify direct (optional) | Live "now playing" straight from Spotify. Spotify only allows this with **Spotify Premium** and your own free developer app: see [Spotify direct](#spotify-direct). |
+| Music | Navidrome | Your Navidrome address and normal login. |
+| Media | Game deals | **Nothing.** On by default: free-to-keep PC games (from [GamerPower](https://www.gamerpower.com)) and top Steam sales (from [CheapShark](https://www.cheapshark.com), US prices). |
+| Media | Letterboxd | **Just a username** (or your profile link). |
+| Media | Jellyfin | Your Jellyfin address and an API key (Jellyfin Dashboard → API Keys → **+**). |
+| News | RSS / Atom | Nothing: gaming news by default. See [News feeds](#news-feeds). |
 
-Keys stay on the server: the browser only talks to pupboard, and cover art and posters are proxied through it.
+**Which service shows on a card:** set "Music card" / "Media card" in Settings (`MUSIC_SOURCE` / `MEDIA_SOURCE`). Automatic picks the first one set up: Navidrome, then Spotify, then ListenBrainz for Music; Jellyfin, then Letterboxd, then game deals for Media.
+
+Keys and passwords stay on the server: the browser only talks to pupboard, and Navidrome/Jellyfin pictures are proxied through it.
+
+### Spotify direct
+
+Spotify's own API needs a developer app per person (since 2026: the app owner must have Premium, and each app allows at most 5 people). If that's too much, use ListenBrainz instead.
+
+1. Open the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and press **Create app**. Any name and description.
+2. Under **Redirect URIs**, paste the one shown on pupboard's Settings page, e.g. `http://127.0.0.1:8742/api/spotify/callback` (Spotify doesn't accept `localhost`). Tick **Web API** and save.
+3. Copy the app's **Client ID** into pupboard's Settings and press **Save**. (No client secret needed.)
+4. Press **Connect Spotify** and allow access. Done: pupboard keeps the sign-in on your computer and refreshes it by itself.
+
+This needs the Settings page, so it works with the download and `npm start`, not inside Docker. Docker users: use ListenBrainz.
 
 ## Clock
 
@@ -111,13 +132,13 @@ cp config/feeds.example.txt config/feeds.txt
 
 ```
 # lines starting with # are ignored
-Hacker News | https://hnrss.org/frontpage
+GamingOnLinux | https://www.gamingonlinux.com/article_rss.php
 https://www.reddit.com/r/selfhosted/.rss      <- no name: the feed's own title is used
 ```
 
 - Edits are picked up automatically, with no restart. In Docker, the `config/` folder is mounted read-only into the container.
 - Up to 50 feeds; duplicates are skipped.
-- Without the file you get Hacker News, Phoronix and Ars Technica. `feeds.txt` is git-ignored.
+- Without the file you get gaming news: Steam News, GamingOnLinux, r/GameDeals and Rock Paper Shotgun. `feeds.example.txt` has more ideas. `feeds.txt` is git-ignored.
 - For a short list you can also use `RSS_FEEDS` in `.env` (comma-separated). The file wins if both exist.
 
 ## Themes

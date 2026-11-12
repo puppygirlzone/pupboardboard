@@ -7,9 +7,9 @@ Rules for anyone changing this project, human or AI. Read this before making cha
 An animated, glanceable stats homepage for self-hosted services, opened in a browser. It pulls several sources into one dashboard:
 
 - **Gaming (Steam):** games played this week, hours spent, which games
-- **Music (Navidrome):** what was listened to, with stats about those songs
-- **Media (Jellyfin):** movies and TV shows recently added
-- **News (RSS/Atom):** latest stories from configured feeds
+- **Music card:** Navidrome, Spotify (direct, PKCE) or Spotify via ListenBrainz: what was listened to, with stats
+- **Media card:** Jellyfin (recently added), Letterboxd (films watched) or game deals (free games + Steam sales)
+- **News (RSS/Atom):** gaming news by default, or the user's feeds
 
 The overview page is the at-a-glance view. Each source has a detail page with more.
 
@@ -20,7 +20,8 @@ The overview page is the at-a-glance view. Each source has a detail page with mo
 3. **Three ways to run it, all kept working:** `npm start` on Linux/macOS/Windows, Docker Compose (including Dockge), and the double-click release downloads for people who have never used a terminal.
 4. **Tests protect every change.** Add or update tests with every change so later changes can't silently break earlier work.
 5. **Glanceable first.** The overview shows the important numbers at a glance; extra detail goes on the detail pages.
-6. **Usable by non-technical people.** Anything a user has to do (set up, update, fix a problem) should be possible without a terminal when they use the release download. Error messages say what to do, in plain words.
+6. **As few API keys as possible.** Prefer services that need nothing (deals, RSS) or just a username (ListenBrainz, Letterboxd). A key is acceptable only when the service offers no other way (Steam playtime). Accept what people naturally paste (profile links) and turn it into what the API needs.
+7. **Usable by non-technical people.** Anything a user has to do (set up, update, fix a problem) should be possible without a terminal when they use the release download. Error messages say what to do, in plain words.
 
 ### Definition of done (for any change)
 
@@ -59,6 +60,16 @@ The overview page is the at-a-glance view. Each source has a detail page with mo
 - **News feeds come from `config/feeds.txt`** (one per line, `Name | url`, `#` comments), mounted read-only in Docker and re-read when it changes. The settings page edits the same file. `RSS_FEEDS` in `.env` is only a fallback for short lists; don't move long lists back into `.env`. `config/feeds.txt` is personal and git-ignored; `config/feeds.example.txt` is the committed template.
 - Node 22+, no framework. Keep dependencies minimal (currently only `animejs`); prefer Node built-ins. Assets are self-hosted, with no CDNs at runtime, so it works offline on a LAN.
 
+### Card slots and sources
+- The overview stays 2×2: Gaming, **Music slot**, **Media slot**, News. `resolveSlots(config)` (`server/config.js`) picks each slot's source: `MUSIC_SOURCE` / `MEDIA_SOURCE`, else "auto" = first configured in `MUSIC_SOURCES` / `MEDIA_SOURCES` order. A chosen-but-unconfigured source still shows, so its card explains how to set it up.
+- `/api/summary` returns only the sources on screen plus `slots`; `warm()` refreshes only those. Don't fetch services nobody is looking at.
+- Every music source returns the same data shape (Navidrome's, plus `art` URLs, `provider`, `note`, `topSongsLabel`, `stats.capped/minutesKnown/exact`), so `musicGlance`/`musicDetail` render all of them. Media sources share a slot but have their own renderers.
+- Sources in a slot reuse that slot's accent tokens (`SOURCES[key].accent`), so new music/media sources need no new theme tokens.
+- **Spotify:** PKCE with only a Client ID; redirect must be `http://127.0.0.1:<port>/api/spotify/callback` (Spotify rejects `localhost`). `/api/spotify/login` and `/disconnect` need the setup code; the callback is loopback-only and accepts only a one-time, 10-minute `state` created by login. The refresh token lives in `DATA_DIR/spotify.json` (0600), never in the browser, logs or summaries. Spotify only returns the last 50 plays: show "50+" (`stats.capped`), not a fake total.
+- **Honest numbers:** ListenBrainz minutes are "—" when most listens lack track lengths (`minutesKnown`); deal counts are "—" when that call failed (`hasFreebies` / `hasDeals`); Letterboxd's feed holds ~50 entries (`capped`).
+- External pictures (Spotify, Cover Art Archive, Letterboxd, deal sites) are shown directly from their https CDNs (`safeImage` in `server/sources/common.js`); only Navidrome/Jellyfin images go through the proxy, because those need credentials.
+- Deals show attribution to GamerPower and CheapShark, and deal links use CheapShark's redirect links, as their API terms ask.
+
 ### Look and feel
 - **Animations:** anime.js v4, served locally from `/vendor`, all in `public/js/motion.js`. Animate `transform`/`opacity`. Respect `prefers-reduced-motion`. If anime.js fails to load, everything must still appear in its final state: views render the final state (bars, numbers, donut slices) and motion only animates *toward* it. `tests/motion.test.js` checks this fallback.
 - **Background:** an animated dot grid on a `<canvas>` (`public/js/backdrop.js`): ripples in the theme's accent colours every few seconds and a soft glow near the pointer. It only redraws while something moves, pauses when the tab is hidden, and is a still grid with reduced motion. No big blurred colour glows behind the cards. Cards and panels are see-through (`--card` ≈ 55% surface) with **no** `backdrop-filter`, so the grid shows through them; only the top bar keeps its blur. Each card keeps its fading accent glow at the top.
@@ -81,7 +92,7 @@ server/app.js              routes, image proxy, setup API, static files, CSP
 server/config.js           .env settings and isConfigured checks
 server/settings.js         settings page storage, validation, precedence
 server/resilience.js       timeouts, retries, caching (use for every upstream)
-server/sources/*.js        steam, steam-history, navidrome, jellyfin, rss
+server/sources/*.js        steam, steam-history, navidrome, jellyfin, rss, listenbrainz, spotify, letterboxd, deals, common
 server/demo/               fake flaky upstreams for demo mode and tests
 config/feeds.example.txt   template for the feed list (feeds.txt)
 public/js/views.js         pure renderers   public/js/app.js     fetch/route/refresh
@@ -99,7 +110,7 @@ tests/                     node:test suites (npm test)
 1. Write `server/sources/<name>.js` with pure normalisers plus a loader that uses `settleAll(tasks, memory)`.
 2. Add config and an `isConfigured` check in `config.js`, fields in `SETTINGS_FIELDS` (`server/settings.js`) and a section in `public/js/setup.js`, and document the settings in `.env.example` and the README.
 3. Register it in `server/app.js` (`sources`), and add invented fake responses to `server/demo/fake-upstreams.js`.
-4. Add glance and detail renderers plus a route in `views.js`, a `SOURCES` entry, a nav link, and an accent token in every theme block.
+4. Add glance and detail renderers in `views.js` and a `SOURCES` entry. For a new card, add a route, a nav link and an accent token in every theme block; for a source that fills an existing slot, add it to `MUSIC_SOURCES`/`MEDIA_SOURCES`, the `GLANCE`/`DETAIL` maps and `slotsOf`, and reuse the slot's accent.
 5. Add tests: parsing (including junk and partial data), the loader with partial failures, rendering in every state, escaping, and settings validation.
 6. Keep the overview free of gaps, and check it in the browser in demo mode.
 

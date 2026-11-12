@@ -84,16 +84,20 @@ test('every upstream down: still 200 with error envelopes', async () => {
   }
 });
 
-test('nothing configured: sources report unconfigured, page still loads', async () => {
+test('nothing configured: zero-setup sources still fill the page', async () => {
   const { dir, cleanup } = await tempDir();
   const config = { ...loadConfig({ ...NO_FEEDS_FILE }), dataDir: dir };
   const app = await start({ config, fetchImpl: stubFetch([]) });
   try {
     const summary = await loadPageLikeABrowser(app.base);
-    for (const key of ['steam', 'navidrome', 'jellyfin']) assert.equal(summary[key].status, 'unconfigured');
+    // Music falls back to ListenBrainz's "how to connect" card; Media to game deals (no setup needed).
+    assert.deepEqual(summary.slots, { music: 'listenbrainz', media: 'deals' });
+    for (const key of ['steam', 'listenbrainz']) assert.equal(summary[key].status, 'unconfigured');
+    assert.notEqual(summary.deals.status, 'unconfigured', 'deals need no setup');
     assert.notEqual(summary.rss.status, 'unconfigured', 'RSS has default feeds');
+    assert.ok(!('jellyfin' in summary) && !('navidrome' in summary), 'sources not on screen are not fetched');
     const health = await (await fetch(`${app.base}/api/health`)).json();
-    assert.deepEqual(health.sources, { steam: false, navidrome: false, jellyfin: false, rss: true });
+    assert.deepEqual(health.sources, { steam: false, navidrome: false, jellyfin: false, rss: true, listenbrainz: false, spotify: false, letterboxd: false, deals: true });
   } finally {
     await app.stop();
     await cleanup();
