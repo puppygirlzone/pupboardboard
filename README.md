@@ -100,6 +100,18 @@ Want live "now playing" straight from Spotify, your own news feeds, or a differe
 > [!IMPORTANT]
 > pupboard has no login. Anyone who can reach its port can see your stats (never your keys). Keep it on your home network, or put it behind a reverse proxy with a password.
 
+## Work in progress
+
+What we're working on, and what's already done:
+
+- [ ] A nicer launcher window for the downloads, instead of a plain black command prompt or terminal window.
+- [ ] Start pupboard automatically when the computer boots, on Windows and Linux.
+- [x] ~~Click a game's name to launch it in Steam (or open its store page).~~
+- [x] ~~Keep background apps like Soundpad and Bongo Cat out of your gaming hours.~~
+- [x] ~~Smoother, less pixelated text.~~
+- [x] ~~Tidier Settings page: no overlapping text, neater Spotify buttons.~~
+- [x] ~~Easier updates: extract a new version over the old one and keep your settings.~~
+
 ## Contributing
 
 Issues and pull requests are welcome! Please read [AGENTS.md](AGENTS.md) first. It holds the project's design and safety rules (it's written for AI coding assistants too).
