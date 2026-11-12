@@ -6,6 +6,9 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+### Fixed
+- Text could look jagged or pixelated around the edges on normal-density screens; letters now keep their smooth shape.
+
 ## [1.3.1] - 2026-11-12
 
 ### Changed
