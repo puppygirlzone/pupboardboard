@@ -6,7 +6,7 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
-Thanks to Bird for testing pupboard and suggesting most of this release: launching games from Steam, keeping background apps out of your hours, and the Settings page fixes.
+Thanks to Bird for testing pupboard and suggesting everything in this release: launching games from Steam, keeping background apps out of your hours, smoother text, and the Settings page fixes.
 
 ### Added
 - Gaming: click a game's name to launch it in Steam (on a computer with Steam installed; your browser asks the first time). Prefer the Steam store page? Choose it in Settings → Gaming (`STEAM_LINKS=store`).
