@@ -68,6 +68,8 @@ const CHOICE_LABELS = {
   USD: 'US dollars ($)',
   AUD: 'Australian dollars (A$)',
   GBP: 'British pounds (£)',
+  launch: 'Launches the game in Steam',
+  store: 'Opens its Steam store page',
   on: 'On',
   off: 'Off',
   '24h': '24-hour (14:30)',

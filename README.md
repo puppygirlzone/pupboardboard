@@ -14,7 +14,7 @@ A colourful, animated homepage that shows your week at a glance: what you played
 
 ## What's on it
 
-- 🎮 **Gaming:** hours played on Steam this week, and which games
+- 🎮 **Gaming:** hours played on Steam this week, and which games (click one to launch it in Steam, or open its store page if you prefer)
 - 🎵 **Music:** now playing, top artists and songs, and listening time, from **Spotify** (through ListenBrainz) or your own **Navidrome**
 - 🎬 **Media:** free games and the best Steam sales, films you've logged on **Letterboxd**, or what's new on your **Jellyfin** server
 - 📰 **News:** gaming news out of the box, or any RSS/Atom feeds you like

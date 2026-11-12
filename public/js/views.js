@@ -123,13 +123,26 @@ function cardShell(key, env, body, now) {
 
 /* ---------------------------------------------------------------- Gaming */
 
-function gameRows(games, limit, maxMinutes) {
+/**
+ * A game's name as a link. mode 'launch' (default) asks Steam to launch it
+ * (steam://rungameid/<appid>, no target: it's handed to the Steam app);
+ * 'store' opens its Steam store page in a new tab (STEAM_LINKS).
+ * Only a whole-number app ID is ever put in a link; anything else stays plain text.
+ */
+export function steamPlayLink(appid, inner, mode = 'launch') {
+  const id = Number(appid);
+  if (!Number.isSafeInteger(id) || id <= 0) return inner;
+  if (mode === 'store') return `<a class="play-link" href="https://store.steampowered.com/app/${e(id)}/" target="_blank" rel="noopener noreferrer" title="Open in the Steam store">${inner}</a>`;
+  return `<a class="play-link" href="steam://rungameid/${e(id)}" title="Launch in Steam">${inner}</a>`;
+}
+
+function gameRows(games, limit, maxMinutes, links) {
   return games
     .slice(0, limit)
     .map(
       (g) => `<li class="row" data-anim>
   ${img(g.icon || g.header, g.name, 'thumb thumb-game')}
-  <div class="row-main"><div class="row-title">${e(g.name)}</div>${bar(g.minutes / maxMinutes, 'bar-steam')}</div>
+  <div class="row-main"><div class="row-title">${steamPlayLink(g.appid, e(g.name), links)}</div>${bar(g.minutes / maxMinutes, 'bar-steam')}</div>
   <div class="row-value">${e(formatMinutes(g.minutes))}</div>
 </li>`,
     )
@@ -146,7 +159,7 @@ export function steamGlance(env, now = Date.now()) {
   ${stat(d.period.label, count(toHours(d.totalMinutes), `${toHours(d.totalMinutes)}h`, { decimals: 1, suffix: 'h' }), 'hours played')}
   ${stat('Games played', count(d.gamesPlayed, String(d.gamesPlayed)))}
 </div>
-${d.games.length ? `<ul class="rows">${gameRows(d.games, 4, max)}</ul>` : '<p class="muted" data-anim>No games played in this period.</p>'}`;
+${d.games.length ? `<ul class="rows">${gameRows(d.games, 4, max, d.links)}</ul>` : '<p class="muted" data-anim>No games played in this period.</p>'}`;
   return cardShell('steam', env, body, now);
 }
 
@@ -228,7 +241,7 @@ export function steamDetail(env, now = Date.now()) {
       (g) => `<article class="game" data-anim>
   ${img(g.header, g.name, 'game-art')}
   <div class="game-body">
-    <h3>${e(g.name)}</h3>
+    <h3>${steamPlayLink(g.appid, e(g.name), d.links)}</h3>
     ${bar(g.minutes / max, 'bar-steam')}
     <dl class="game-stats">
       ${(() => {

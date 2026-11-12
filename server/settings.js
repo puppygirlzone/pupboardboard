@@ -22,6 +22,7 @@ const fromLink = (pattern) => (v) => v.match(pattern)?.[1] ?? v;
 export const SETTINGS_FIELDS = [
   { key: 'STEAM_ID', section: 'steam', label: 'Steam profile link (or SteamID64)' },
   { key: 'STEAM_API_KEY', section: 'steam', label: 'Steam Web API key', secret: true },
+  { key: 'STEAM_LINKS', section: 'steam', label: 'Clicking a game’s name', choices: ['launch', 'store'] },
   { key: 'STEAM_HIDE', section: 'steam', label: 'Don’t count these apps (names or app IDs, separated by commas)', placeholder: `${DEFAULT_STEAM_HIDE.join(', ')} (the default)` },
   { key: 'MUSIC_SOURCE', section: 'music', label: 'Show on the Music card', choices: ['auto', ...MUSIC_SOURCES] },
   {

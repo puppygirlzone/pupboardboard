@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { escapeHtml, formatMinutes, formatDuration, timeAgo, toHours, plural, greeting } from '../public/js/format.js';
-import { ROUTES, resolveRoute, overview, statusPill, steamDetail, navidromeDetail, jellyfinDetail, rssDetail, rssGlance, sevenDayMinutes } from '../public/js/views.js';
+import { ROUTES, resolveRoute, overview, statusPill, steamDetail, navidromeDetail, jellyfinDetail, rssDetail, rssGlance, sevenDayMinutes, steamGlance, steamPlayLink } from '../public/js/views.js';
 import { createApp } from '../server/app.js';
 import { loadConfig } from '../server/config.js';
 import { createFakeFetch } from '../server/demo/fake-upstreams.js';
@@ -190,4 +190,29 @@ test('game cards: last 7 days is exact with history, half of 2 weeks (marked ~) 
 
   const later = steamDetail(env({ kind: 'week', label: 'Last 7 days', since: '2026-11-05T00:00:00Z' }), NOW);
   assert.match(later, /<dt>Last 7 days<\/dt><dd>10h 10m<\/dd>/, 'exact value, no ~');
+});
+
+test('steam game names launch the game in Steam, and only with a whole-number app ID', () => {
+  assert.equal(steamPlayLink(1145360, 'Hades'), '<a class="play-link" href="steam://rungameid/1145360" title="Launch in Steam">Hades</a>');
+  for (const bad of ['1; steam://uninstall/1', '12abc', -5, 0, 1.5, null, undefined, '']) {
+    assert.equal(steamPlayLink(bad, 'X'), 'X');
+    assert.equal(steamPlayLink(bad, 'X', 'store'), 'X');
+  }
+  assert.equal(steamPlayLink(620, 'Portal', 'store'), '<a class="play-link" href="https://store.steampowered.com/app/620/" target="_blank" rel="noopener noreferrer" title="Open in the Steam store">Portal</a>');
+  for (const html of [steamGlance, steamDetail].map((f) => f({ status: 'ok', updatedAt: new Date(NOW).toISOString(), data: { period: { kind: 'twoWeeks', label: 'L', since: '' }, totalMinutes: 5, gamesPlayed: 1, minutes2Weeks: 5, games: [{ appid: 620, name: 'Portal', minutes: 5, minutes2Weeks: 5, minutesForever: 5 }], player: null, links: 'store' } }, NOW))) {
+    assert.match(html, /href="https:\/\/store\.steampowered\.com\/app\/620\/"/);
+    assert.doesNotMatch(html, /steam:\/\//);
+  }
+  const data = { period: { kind: 'twoWeeks', label: 'L', since: '' }, totalMinutes: 5, gamesPlayed: 1, minutes2Weeks: 5, games: [{ appid: 620, name: '<b>Portal</b>', minutes: 5, minutes2Weeks: 5, minutesForever: 5 }], player: null };
+  const env = { status: 'ok', data, updatedAt: new Date(NOW).toISOString() };
+  for (const html of [steamGlance(env, NOW), steamDetail(env, NOW)]) {
+    assert.match(html, /<a class="play-link" href="steam:\/\/rungameid\/620" title="Launch in Steam">&lt;b&gt;Portal&lt;\/b&gt;<\/a>/);
+    assert.doesNotMatch(html, /href="steam:[^"]*"[^>]*target=/);
+  }
+});
+
+test('STEAM_LINKS: launch by default, store when asked, anything else falls back to launch', () => {
+  assert.equal(loadConfig({}).steam.links, 'launch');
+  assert.equal(loadConfig({ STEAM_LINKS: ' Store ' }).steam.links, 'store');
+  assert.equal(loadConfig({ STEAM_LINKS: 'javascript:alert(1)' }).steam.links, 'launch');
 });
