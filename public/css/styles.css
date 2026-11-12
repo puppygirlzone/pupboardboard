@@ -466,13 +466,13 @@ s { text-decoration-thickness: 1px; }
 :root[data-egg="aiko"] { --font: 'Aiko JP', 'Monoid Web', ui-sans-serif, sans-serif; }
 /* The secret-word box that 5 taps on the greeting open (for phones). */
 /* One pill: the input, then the OK button as its pink right end. The pill
-   carries the border and the focus ring, so the two read as one control. */
+   carries the border, so the two read as one control (no extra focus ring:
+   the open box itself shows where you are typing). */
 .egg-prompt {
   display: inline-flex; align-items: stretch; margin-top: 8px; overflow: hidden;
   border: 1px solid var(--music-ink); border-radius: 999px; background: var(--tint);
   animation: egg-prompt-in 0.25s ease-out;
 }
-.egg-prompt:focus-within { outline: 2px solid var(--music-ink); outline-offset: 2px; }
 .egg-prompt input {
   font: inherit; font-size: 0.9rem; width: 11em; padding: 6px 10px 6px 14px; color: var(--text);
   background: transparent; border: 0; outline: none;
