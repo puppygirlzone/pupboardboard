@@ -469,6 +469,7 @@ p.setup-error { color: var(--err-ink); margin: 4px 0 0; }
 .page-head .via { font-size: 0.8rem; vertical-align: middle; }
 .tile-poster { aspect-ratio: 2 / 3; }
 .row-title a:hover, .tile a:hover { text-decoration: underline; }
+.play-link:hover { color: var(--steam-ink); text-decoration: underline; text-underline-offset: 3px; }
 s { text-decoration-thickness: 1px; }
 
 /* ---------------------------------------------------------------- Easter eggs */

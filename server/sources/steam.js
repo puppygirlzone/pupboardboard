@@ -198,6 +198,7 @@ export function createSteamLoader({ config, fetchImpl, history, now = Date.now }
     // call failed, the result would be a misleading 0h, so treat it as a failure
     // (the cache then keeps showing the last good data).
     if (data.period.kind !== 'week' && !values.recent) throw new Error(warnings.find((w) => w.startsWith('recent')) ?? 'Steam recent games unavailable');
+    data.links = config.steam.links === 'store' ? 'store' : 'launch';
     return config.demo ? withDemoArt(data) : data;
   };
 }

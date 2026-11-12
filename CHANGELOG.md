@@ -6,6 +6,9 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+### Added
+- Gaming: click a game's name to launch it in Steam (on a computer with Steam installed; your browser asks the first time). Prefer the Steam store page? Choose it in Settings → Gaming (`STEAM_LINKS=store`).
+
 ### Fixed
 - Gaming: apps that run in the background, such as Soundpad, Bongo Cat and Wallpaper Engine, no longer count as games or flood your hours. Change the list in Settings → Gaming, or with `STEAM_HIDE` ("none" counts everything).
 - Text could look jagged or pixelated around the edges on normal-density screens; letters now keep their smooth shape.

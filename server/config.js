@@ -49,6 +49,8 @@ export function loadConfig(env = process.env) {
     steam: {
       apiKey: str(env.STEAM_API_KEY),
       steamId: str(env.STEAM_ID),
+      // What clicking a game name does: launch it in Steam (default) or open its store page.
+      links: str(env.STEAM_LINKS).toLowerCase() === 'store' ? 'store' : 'launch',
       hide: str(env.STEAM_HIDE), // empty = the built-in list (DEFAULT_STEAM_HIDE)
       ttlMs: positive(env.STEAM_CACHE_SECONDS, 300) * 1000,
     },
