@@ -49,6 +49,7 @@ export function loadConfig(env = process.env) {
     steam: {
       apiKey: str(env.STEAM_API_KEY),
       steamId: str(env.STEAM_ID),
+      hide: str(env.STEAM_HIDE), // empty = the built-in list (DEFAULT_STEAM_HIDE)
       ttlMs: positive(env.STEAM_CACHE_SECONDS, 300) * 1000,
     },
     navidrome: {

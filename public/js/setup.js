@@ -17,7 +17,7 @@ const SECTIONS = [
     help: [
       'Paste your Steam profile link (open your profile in Steam, right-click the page and copy its address). Steam also needs a free Web API key from ',
       ['steamcommunity.com/dev/apikey', 'https://steamcommunity.com/dev/apikey'],
-      ' (for “Domain name” anything works, e.g. localhost). In Steam, set your profile’s “Game details” privacy to Public.',
+      ' (for “Domain name” anything works, e.g. localhost). In Steam, set your profile’s “Game details” privacy to Public. Some apps Steam calls games just run in the background (like Soundpad or Bongo Cat); list them under “Don’t count these apps” to keep them out of your hours. Type “none” to count everything.',
     ],
   },
   { id: 'music', title: 'Music card', help: ['Which service the Music card shows. “Automatic” uses the first one below that is set up.'] },
@@ -177,7 +177,8 @@ function spotifyBlock(data) {
     }
   });
   const parts = [el('label', { text: 'Redirect URI (paste this into your Spotify app)' }), el('div', { class: 'setup-row' }, [uri, copy])];
-  const status = el('p', { class: 'small', text: sp.connected ? `Connected${sp.connectedAt ? ` since ${new Date(sp.connectedAt).toLocaleDateString()}` : ''}.` : field?.isSet ? 'Not connected yet.' : 'Save your Client ID first, then connect.' });
+  const status = el('p', { class: 'small setup-spotify-status', text: sp.connected ? '' : field?.isSet ? 'Not connected yet.' : 'Save your Client ID first, then connect.' });
+  status.hidden = !status.textContent;
   const connect = el('button', { type: 'button', class: 'setup-button', text: sp.connected ? 'Reconnect Spotify' : 'Connect Spotify', disabled: !field?.isSet });
   connect.addEventListener('click', async () => {
     connect.disabled = true;
@@ -189,17 +190,18 @@ function spotifyBlock(data) {
     }
     connect.disabled = false;
     status.textContent = out.error ?? 'Couldn’t start the Spotify sign-in.';
+    status.hidden = false;
   });
   const buttons = [connect];
   if (sp.connected) {
-    const off = el('button', { type: 'button', class: 'setup-link', text: 'Disconnect' });
+    const off = el('button', { type: 'button', class: 'setup-pill-danger', text: 'Disconnect' });
     off.addEventListener('click', async () => {
       await fetch('/api/spotify/disconnect', { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', 'x-setup-code': code }, body: '{}' }).catch(() => null);
       load({ quiet: true });
     });
     buttons.push(off);
   }
-  return el('div', { class: 'setup-field' }, [...parts, el('div', { class: 'setup-row setup-connect' }, buttons), status]);
+  return el('div', { class: 'setup-field' }, [...parts, status, el('div', { class: 'setup-connect' }, buttons)]);
 }
 
 function fieldControl(f, currentHost) {
@@ -218,7 +220,7 @@ function fieldControl(f, currentHost) {
       autocomplete: f.secret ? 'new-password' : 'off',
       spellcheck: 'false',
       value: f.secret ? '' : f.value,
-      placeholder: f.secret && f.isSet ? 'Saved (leave empty to keep it)' : '',
+      placeholder: f.secret && f.isSet ? 'Saved (leave empty to keep it)' : f.placeholder ?? '',
       disabled: f.locked,
     });
   }
@@ -254,7 +256,7 @@ function render(data) {
     for (const f of data.fields.filter((x) => x.section === section.id)) box.append(fieldControl(f, data.host));
     if (section.id === 'spotify') box.append(spotifyBlock(data));
     if ((section.id === 'music' || section.id === 'media') && data.slots) {
-      box.append(el('p', { class: 'muted small', text: `Showing now: ${CHOICE_LABELS[data.slots[section.id]] ?? data.slots[section.id]}.` }));
+      box.append(el('p', { class: 'muted small setup-current', text: `Showing now: ${CHOICE_LABELS[data.slots[section.id]] ?? data.slots[section.id]}.` }));
     }
     form.append(box);
   }

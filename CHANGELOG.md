@@ -7,7 +7,10 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 ## [Unreleased]
 
 ### Fixed
+- Gaming: apps that run in the background, such as Soundpad, Bongo Cat and Wallpaper Engine, no longer count as games or flood your hours. Change the list in Settings → Gaming, or with `STEAM_HIDE` ("none" counts everything).
 - Text could look jagged or pixelated around the edges on normal-density screens; letters now keep their smooth shape.
+- Settings: the "Showing now" line under the Music and Media card choices no longer overlaps the dropdown.
+- Settings: the Spotify buttons sit at the bottom of their box, with Disconnect as a small red button on the right; the "Connected since" date that got in the way is gone.
 
 ## [1.3.1] - 2026-11-12
 

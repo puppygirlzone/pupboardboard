@@ -445,6 +445,16 @@ p.setup-error { color: var(--err-ink); margin: 4px 0 0; }
 .setup-button:disabled { opacity: 0.6; cursor: wait; }
 .setup-link { font: inherit; font-size: 0.85rem; cursor: pointer; color: var(--steam-ink); background: none; border: 0; padding: 0; align-self: flex-start; text-decoration: underline; }
 .setup-actions { display: flex; justify-content: flex-end; margin-bottom: 32px; }
+.setup-section > p.setup-current { margin: 8px 0 0; }
+.setup-spotify-status { margin: 4px 0 0; }
+.setup-connect { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.setup-pill-danger {
+  font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--err-ink);
+  background: color-mix(in srgb, var(--err) 16%, transparent); border: 1px solid color-mix(in srgb, var(--err) 45%, transparent);
+  border-radius: 999px; padding: 5px 14px; margin-left: auto;
+}
+.setup-pill-danger:hover { background: color-mix(in srgb, var(--err) 26%, transparent); }
+.setup-pill-danger:focus-visible { outline: 2px solid var(--err-ink); outline-offset: 2px; }
 .settings-link {
   display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 999px;
   border: 1px solid var(--border); background: var(--tint); color: var(--muted);
