@@ -60,6 +60,9 @@ body {
   background: transparent;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  /* Keep Monoid's true outlines instead of snapping them to the pixel grid
+     (hinting made the thin strokes look jagged on normal-density screens). */
+  text-rendering: geometricPrecision;
 }
 a { color: inherit; text-decoration: none; }
 h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }

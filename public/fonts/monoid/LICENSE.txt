@@ -2,3 +2,6 @@ Monoid by Andreas Larsen and contributors.
 https://github.com/larsenwork/monoid
 Licensed under the MIT license and the SIL Open Font License 1.1 (see the repository for full texts).
 Files: Monoid-Retina.ttf, Monoid-Regular.ttf from the official release (Monoid.zip).
+
+The copies here have their TrueType hinting removed (so letters keep their
+smooth outline shape on screens that would otherwise snap them to pixels).
