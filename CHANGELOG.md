@@ -6,6 +6,8 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-12
+
 Thanks to Bird for testing pupboard and suggesting everything in this release: launching games from Steam, keeping background apps out of your hours, smoother text, and the Settings page fixes.
 
 ### Added
@@ -77,7 +79,8 @@ First public release.
 - **Docker image** on ghcr.io (amd64 and arm64), with Compose and Dockge support.
 - Copes with unreliable services: timeouts, retries, cached data marked **Offline** or **Partial**, and "—" instead of a misleading 0.
 
-[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/puppygirlzone/pupboardboard/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.1.0...v1.2.0
