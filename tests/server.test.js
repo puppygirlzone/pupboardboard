@@ -28,6 +28,7 @@ const PAGE_ASSETS = [
   '/js/motion.js',
   '/js/themes.js',
   '/js/theme-controls.js',
+  '/js/menu.js',
   '/js/puppy.js',
   '/js/puppy-mode.js',
   '/js/backdrop.js',

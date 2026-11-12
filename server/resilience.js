@@ -21,8 +21,40 @@ export function hostOf(url) {
   }
 }
 
+/**
+ * Reads a response body, giving up as soon as it passes maxBytes (a server
+ * that never sends Content-Length can't make us buffer gigabytes).
+ */
+export async function readCapped(res, maxBytes, label = 'upstream') {
+  if (Number(res.headers.get('content-length')) > maxBytes) throw new UpstreamError(`${label} response too large`);
+  if (!res.body) return Buffer.alloc(0);
+  const chunks = [];
+  let size = 0;
+  let tooBig = false;
+  for await (const chunk of res.body) {
+    size += chunk.byteLength;
+    if (size > maxBytes) {
+      tooBig = true;
+      break; // leaving the loop cancels the stream
+    }
+    chunks.push(Buffer.from(chunk));
+  }
+  if (tooBig) throw new UpstreamError(`${label} response too large`);
+  return Buffer.concat(chunks);
+}
+
+async function readBodyText(res, url, maxBytes) {
+  try {
+    return (await readCapped(res, maxBytes, hostOf(url))).toString('utf8');
+  } catch (err) {
+    if (err instanceof UpstreamError) throw err;
+    const reason = err?.name === 'TimeoutError' || err?.name === 'AbortError' ? 'timed out' : 'response could not be read';
+    throw new UpstreamError(`${hostOf(url)} ${reason}`);
+  }
+}
+
 /** allowEmpty: a 204 / empty body resolves to null instead of "invalid JSON". */
-export async function fetchJson(fetchImpl, url, { timeoutMs = 8000, headers, method = 'GET', body, allowEmpty = false } = {}) {
+export async function fetchJson(fetchImpl, url, { timeoutMs = 8000, headers, method = 'GET', body, allowEmpty = false, maxBytes = 5_000_000 } = {}) {
   let res;
   try {
     res = await fetchImpl(url, { method, headers, body, signal: AbortSignal.timeout(timeoutMs) });
@@ -31,17 +63,10 @@ export async function fetchJson(fetchImpl, url, { timeoutMs = 8000, headers, met
     throw new UpstreamError(`${hostOf(url)} ${reason}`);
   }
   if (!res.ok) throw new UpstreamError(`${hostOf(url)} returned HTTP ${res.status}`, res.status);
-  if (allowEmpty) {
-    const text = await res.text().catch(() => '');
-    if (res.status === 204 || !text.trim()) return null;
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new UpstreamError(`${hostOf(url)} returned invalid JSON`);
-    }
-  }
+  const text = await readBodyText(res, url, maxBytes);
+  if (allowEmpty && (res.status === 204 || !text.trim())) return null;
   try {
-    return await res.json();
+    return JSON.parse(text);
   } catch {
     throw new UpstreamError(`${hostOf(url)} returned invalid JSON`);
   }
@@ -57,16 +82,7 @@ export async function fetchText(fetchImpl, url, { timeoutMs = 8000, headers, max
     throw new UpstreamError(`${hostOf(url)} ${reason}`);
   }
   if (!res.ok) throw new UpstreamError(`${hostOf(url)} returned HTTP ${res.status}`, res.status);
-  const declared = Number(res.headers.get('content-length'));
-  if (declared > maxBytes) throw new UpstreamError(`${hostOf(url)} response too large`);
-  let text;
-  try {
-    text = await res.text();
-  } catch {
-    throw new UpstreamError(`${hostOf(url)} response could not be read`);
-  }
-  if (text.length > maxBytes) throw new UpstreamError(`${hostOf(url)} response too large`);
-  return text;
+  return readBodyText(res, url, maxBytes);
 }
 
 // Runs several named requests at once. Returns the successful values plus a

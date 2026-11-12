@@ -2,7 +2,7 @@
 // key, just a username.
 
 import { fetchText, settleAll, UpstreamError } from '../resilience.js';
-import { tagText, toPlainText, decodeEntities } from './rss.js';
+import { tagText, toPlainText, decodeEntities, itemBlocks } from './rss.js';
 import { safeImage, safeHttpLink, DAY } from './common.js';
 
 export const validLetterboxdUser = (v) => typeof v === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(v);
@@ -11,8 +11,7 @@ export const validLetterboxdUser = (v) => typeof v === 'string' && /^[A-Za-z0-9_
 export function parseDiary(xml, opts) {
   const text = String(xml ?? '');
   if (!/<rss\b/i.test(text)) throw new UpstreamError('Letterboxd returned something that is not a feed');
-  return [...text.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)]
-    .map((m) => m[1])
+  return itemBlocks(text, ['item'])
     .map((block) => {
       const title = tagText(block, 'letterboxd:filmTitle');
       if (!title) return null;

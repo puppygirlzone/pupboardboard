@@ -185,6 +185,26 @@ export function moveNavIndicator(nav, { instant = false } = {}) {
   run(pill, { translateX: x, width: w, duration: 650, ease: 'outElastic(1, .75)' }, false);
 }
 
+/** Menu tray: the pill floats out leftwards, its controls spring in from the button outwards. */
+export function trayOpen(tray) {
+  if (!tray || !canAnimate()) return;
+  const items = [...tray.children];
+  const stagger = anime.stagger ? anime.stagger(55, { from: 'last' }) : 0;
+  run(tray, { opacity: [0, 1], translateX: [24, 0], scaleX: [0.6, 1], duration: 380, ease: 'outBack(1.3)' }, false);
+  run(items, { opacity: [0, 1], translateX: [26, 0], scale: [0.7, 1], delay: stagger, duration: 520, ease: 'outBack(1.6)' }, false);
+}
+
+/** Tray tucks back into the button; resolves when done (immediately without animation). */
+export function trayClose(tray) {
+  return new Promise((resolve) => {
+    if (!tray) return resolve();
+    run([...tray.children], { opacity: [1, 0], translateX: [0, 18], duration: 160, ease: 'inQuad' }, false);
+    const a = run(tray, { opacity: [1, 0], translateX: [0, 20], scaleX: [1, 0.7], duration: 220, delay: 60, ease: 'inQuad', onComplete: resolve }, false);
+    if (!a) resolve();
+    else setTimeout(resolve, 600);
+  });
+}
+
 /** Card icons wiggle when the pointer enters a card (one listener for the whole page). */
 export function initHoverEffects() {
   let current = null;

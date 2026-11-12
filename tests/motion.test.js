@@ -80,7 +80,7 @@ test('gaming page draws the donut in its final state (correct with animations of
 test('nothing anime.js animates has a CSS transform transition or hover (it would stutter)', async () => {
   const css = (await readFile(new URL('../public/css/styles.css', import.meta.url), 'utf8')).replace(/\/\*[\s\S]*?\*\//g, '');
   // Elements whose transform anime.js drives (see motion.js).
-  const animated = ['.card', '.stat', '.game', '.media-card', '.poster', '.tile', '.feed-item', '.legend-item', '.donut', '.nav-indicator', '.icon', '.mode-toggle', '.toast', '.paw-burst', '.view'];
+  const animated = ['.card', '.stat', '.game', '.media-card', '.poster', '.tile', '.feed-item', '.legend-item', '.donut', '.nav-indicator', '.icon', '.mode-toggle', '.theme-picker', '.settings-link', '.menu-tray', '.toast', '.paw-burst', '.view'];
   const problems = [];
   for (const m of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
     const body = m[2];
@@ -94,4 +94,13 @@ test('nothing anime.js animates has a CSS transform transition or hover (it woul
     }
   }
   assert.deepEqual(problems, []);
+});
+
+test('top-bar controls live in the hamburger tray, wired for screen readers', async () => {
+  const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+  const tray = html.match(/<div class="menu-tray" id="menu-tray" hidden>([\s\S]*?)\n          <\/div>/)?.[1] ?? '';
+  for (const id of ['theme-select', 'mode-toggle']) assert.ok(tray.includes(`id="${id}"`), `${id} is in the tray`);
+  assert.match(html, /<button id="menu-toggle" class="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-tray" aria-label="Open menu"/);
+  const motion = await readFile(new URL('../public/js/motion.js', import.meta.url), 'utf8');
+  assert.match(motion, /export function trayOpen\(tray\) \{\n  if \(!tray \|\| !canAnimate\(\)\) return;/, 'without anime.js the tray just appears');
 });

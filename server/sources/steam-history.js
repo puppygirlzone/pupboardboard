@@ -36,10 +36,25 @@ export function createSteamHistory({ dataDir, fileName = 'steam-history.json' })
     }
   }
 
+  // History from a different Steam account would make "last 7 days" wrong: start over.
+  async function forAccount(account) {
+    const s = await load();
+    if (account && s.account && s.account !== account) {
+      s.snapshots = [];
+      console.log('[steam] different Steam account: starting play history again');
+    }
+    if (account) s.account = account;
+    return s;
+  }
+
   return {
+    /** Snapshots so far without adding one (when the library call failed). */
+    async current(account = null) {
+      return (await forAccount(account)).snapshots;
+    },
     /** totals: { [appid]: minutesForever }. Returns all snapshots, oldest first. */
-    async record(totals, at) {
-      const s = await load();
+    async record(totals, at, account = null) {
+      const s = await forAccount(account);
       const last = s.snapshots.at(-1);
       if (!last || at - last.at >= HOUR) {
         s.snapshots.push({ at, totals });
