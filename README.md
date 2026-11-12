@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="docs/banner.png" alt="pupboardboard: a blurred screenshot of the dashboard with the name pupboardboard written over it, because pupboard was already taken" width="100%">
+  <img src="docs/banner.png" alt="pupboardboard: a blurred screenshot of the dashboard with the name pupboardboard written over it, because pupboard was already taken by me" width="100%">
 </p>
 
 # pupboardboard
 
-*Because pupboard was already taken.* (The app still calls itself pupboard; the repo got the extra board.)
+*Because pupboard was already taken by me.* (The app still calls itself pupboard; the repo got the extra board.)
 
 A colourful, animated homepage that shows your week at a glance:
 
