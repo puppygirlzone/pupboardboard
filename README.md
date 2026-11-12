@@ -42,7 +42,7 @@ Pick whichever suits you:
 
 And ya done! Keep the little black window open while you use it, and bookmark <http://localhost:8742>. Nothing gets installed: deleting the folder removes everything.
 
-**Updating:** unzip the new version and copy the `data` and `config` folders across from the old one.
+**Updating:** every zip unzips to a folder called `pupboard`, and your settings live in its `data` and `config` folders, which a new version never overwrites. On Windows, extract the new zip to the same place and choose to replace the files. On macOS, copy `data` and `config` from the old folder into the new one.
 
 ### 🐳 Docker Compose (home servers, Dockge, Portainer)
 

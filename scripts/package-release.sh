@@ -4,7 +4,9 @@
 #
 #   scripts/package-release.sh <os> <arch>      os: win | linux | darwin   arch: x64 | arm64
 #
-# Output: build/pupboard-<version>-<os>-<arch>.zip
+# Output: build/pupboard-<version>-<os>-<arch>.zip, holding one folder called
+# "pupboard" (no version), so a new version can be extracted over an old one.
+# The zip never contains files inside data/ or a config/feeds.txt, so settings survive.
 #
 # Environment:
 #   VERSION      version in the file name (default: package.json version)
@@ -25,11 +27,12 @@ version="${VERSION:-$(node -p "require('$root/package.json').version")}"
 version="${version#v}"
 name="pupboard-${version}-${os}-${arch}"
 build="$root/build"
-stage="$build/$name"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
+stage="$work/pupboard"
 
-rm -rf "$stage" "$build/$name.zip"
+mkdir -p "$build"
+rm -f "$build/$name.zip"
 mkdir -p "$stage/runtime" "$stage/config" "$stage/data"
 
 # --- the app
@@ -88,5 +91,5 @@ fi
 chmod 755 "$stage/runtime/$exe"
 
 # --- zip it (keeps the executable bits for macOS/Linux)
-(cd "$build" && zip -qr -X "$name.zip" "$name")
+(cd "$work" && zip -qr -X "$build/$name.zip" pupboard)
 echo "Built $build/$name.zip"

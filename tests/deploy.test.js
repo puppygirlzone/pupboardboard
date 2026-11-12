@@ -54,6 +54,9 @@ test('release downloads: every launcher opens the browser and stays on this comp
   }
   const script = await read('scripts/package-release.sh');
   assert.match(script, /sha256sum -c/, 'downloaded Node.js is checksum-verified');
+  // Same folder name in every version, so a new zip extracts over the old one (settings in data/ survive).
+  assert.match(script, /stage="\$work\/pupboard"/, 'zip contents live in a plain pupboard folder');
+  assert.match(script, /zip -qr -X "\$build\/\$name\.zip" pupboard\)/, 'the zip keeps the version in its file name only');
   const release = await read('.github/workflows/release.yml');
   for (const target of ['win-x64', 'darwin-arm64', 'darwin-x64', 'linux-x64']) assert.ok(release.includes(target), target);
 });
