@@ -9,6 +9,7 @@ import { initPuppyMode, activeEgg } from './puppy-mode.js';
 import { startBackdrop } from './backdrop.js';
 import { mergeNowPlaying, fetchNowPlaying } from './live.js';
 import { EGGS, eggGreeting, eggVerb } from './eggs.js';
+import { steamImageUrls, createImageWarmer } from './images.js';
 
 const REFRESH_MS = 60_000;
 const LOADING_RETRY_MS = 4_000;
@@ -16,6 +17,8 @@ const STORE_KEY = 'pupboard:last-summary';
 const KEYS = Object.keys(SOURCES);
 
 const $ = (sel) => document.querySelector(sel);
+// Pictures held ready in memory so redraws don't flash empty boxes.
+const pictures = createImageWarmer();
 const view = $('#view');
 const syncDot = $('#sync-dot');
 const syncText = $('#sync-text');
@@ -101,6 +104,8 @@ async function load({ animate }) {
   const changed = payload !== lastPayload;
   summary = next;
   lastPayload = payload;
+  // Fetch Steam's game art and avatar now, so the Gaming page has them ready.
+  pictures.warm(steamImageUrls(summary));
   if (animate) render(true);
   else if (changed) render(false);
   updateSync(true);
@@ -128,8 +133,9 @@ function render(withEntrance) {
   else refresh(view);
 }
 
-/** Swap broken images for a neutral placeholder. */
+/** Keep pictures ready for the next draw; swap broken ones for a neutral placeholder. */
 function wireImages(root) {
+  pictures.warm([...root.querySelectorAll('img[data-fallback]')].map((img) => img.src));
   root.querySelectorAll('img[data-fallback]').forEach((img) => {
     const swap = () => {
       const ph = document.createElement('div');

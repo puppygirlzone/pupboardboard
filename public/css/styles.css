@@ -253,6 +253,8 @@ code { font-family: var(--mono); font-size: 0.9em; background: var(--track); pad
 .bar-music .bar-fill { background: linear-gradient(90deg, color-mix(in srgb, var(--music) 55%, var(--bg)), var(--music)); }
 
 .img-missing { background: linear-gradient(135deg, var(--track), var(--tint)); }
+/* While a picture loads: a soft tile, not a white box with its alt text. */
+img[data-fallback] { background: var(--track); color: transparent; }
 
 /* ---------- now playing ---------- */
 .now-playing { display: flex; gap: 14px; align-items: center; padding: 12px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--music) 9%, transparent); border: 1px solid color-mix(in srgb, var(--music) 22%, transparent); }

@@ -6,6 +6,9 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+### Fixed
+- Steam game art and your profile picture no longer flash as empty boxes with text when you open the overview or switch to Gaming. Pictures are loaded ahead of time and kept ready, and one that is still loading shows a soft tile instead of a white box.
+
 ## [1.4.1] - 2026-11-13
 
 ### Changed

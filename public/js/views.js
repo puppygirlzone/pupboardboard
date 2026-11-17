@@ -64,7 +64,7 @@ export const artUrl = (item, size = 300) => item?.art || coverUrl(item?.coverId,
 
 const img = (src, alt, cls) =>
   src
-    ? `<img class="${cls}" src="${e(src)}" alt="${e(alt)}" loading="lazy" decoding="async" data-fallback>`
+    ? `<img class="${cls}" src="${e(src)}" alt="${e(alt)}" decoding="async" data-fallback>`
     : `<div class="${cls} img-missing" role="img" aria-label="${e(alt)}"></div>`;
 
 const count = (value, text, { decimals = 0, suffix = '' } = {}) =>
