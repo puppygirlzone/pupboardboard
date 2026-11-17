@@ -60,7 +60,8 @@ test('MPRIS names: only media players, capped', () => {
   const many = `([${Array.from({ length: 30 }, (_, i) => `'org.mpris.MediaPlayer2.p${i}'`).join(', ')}],)`;
   assert.equal(parseMprisNames(many).length, 8);
   assert.deepEqual(parseMprisNames("(['org.mpris.MediaPlayer2.bad name;rm'],)"), []);
-  assert.equal(playerName('org.mpris.MediaPlayer2.vlc.instance4242'), 'vlc');
+  assert.equal(playerName('org.mpris.MediaPlayer2.vlc.instance4242'), 'Vlc');
+  assert.equal(playerName('org.mpris.MediaPlayer2.strawberry'), 'Strawberry');
   assert.equal(playerName('org.mpris.MediaPlayer2.Feishin'), 'Feishin');
 });
 

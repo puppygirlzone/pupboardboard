@@ -209,10 +209,11 @@ export function publicTrack(t) {
   return ref ? { ...rest, art: `/api/local/art?k=${artKey(ref)}` } : rest;
 }
 
-/** "org.mpris.MediaPlayer2.Feishin" / "...vlc.instance1234" -> "Feishin" / "vlc". */
+/** "org.mpris.MediaPlayer2.Feishin" / "...strawberry" / "...vlc.instance1234" -> "Feishin" / "Strawberry" / "Vlc". */
 export function playerName(busName) {
   const rest = String(busName ?? '').replace(/^org\.mpris\.MediaPlayer2\./, '');
-  return rest.split('.')[0] || rest;
+  const name = rest.split('.')[0] || rest;
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 /** MPRIS bus names from `gdbus ... ListNames` output. */
