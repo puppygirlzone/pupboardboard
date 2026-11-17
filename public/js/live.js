@@ -19,3 +19,21 @@ export async function fetchNowPlaying(timeoutMs = 2500, fetchImpl = globalThis.f
     return null;
   }
 }
+
+/** "On this PC": keep the live answer on the summary (summary.local); anything unusable leaves it as is. */
+export function mergeLocal(summary, live) {
+  if (!summary || !live || typeof live !== 'object' || typeof live.status !== 'string') return summary;
+  const playing = live.status === 'ok' && live.playing && typeof live.playing === 'object' ? live.playing : null;
+  return { ...summary, local: { status: live.status, playing } };
+}
+
+/** What a player on the dashboard's computer is playing; null on any failure or after timeoutMs. */
+export async function fetchLocalPlaying(timeoutMs = 2500, fetchImpl = globalThis.fetch) {
+  try {
+    const res = await fetchImpl('/api/local/now-playing', { cache: 'no-store', signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}

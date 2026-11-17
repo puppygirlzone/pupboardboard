@@ -18,6 +18,7 @@ import { createListenBrainzLoader } from './sources/listenbrainz.js';
 import { createSpotifyAuth, createSpotifyLoader } from './sources/spotify.js';
 import { createDealsLoader } from './sources/deals.js';
 import { createLetterboxdLoader } from './sources/letterboxd.js';
+import { createLocalPlayer, createDemoLocalPlayer } from './sources/local-player.js';
 import { demoArtSvg } from './demo/fake-upstreams.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -111,16 +112,17 @@ function readBody(req, limit) {
  */
 const activeNames = (slots) => [...new Set(['steam', slots.music, slots.media, 'rss'])];
 
-export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, retryDelayMs = 300, summaryBudgetMs = 4000, setup = null }) {
+export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, retryDelayMs = 300, summaryBudgetMs = 4000, setup = null, inContainer = false, localPlayerFactory = null }) {
   // Callers (tests, older configs) may leave out the newer sections: fill in defaults.
   const defaults = loadConfig({ RSS_FEEDS: 'off' });
-  for (const key of ['listenbrainz', 'spotify', 'letterboxd', 'deals', 'slots']) config[key] ??= defaults[key];
+  for (const key of ['listenbrainz', 'spotify', 'letterboxd', 'deals', 'slots', 'localPlayer']) config[key] ??= defaults[key];
   const history = createSteamHistory({ dataDir: config.dataDir, fileName: config.demo ? 'steam-history.demo.json' : 'steam-history.json' });
   const common = { config, fetchImpl, now };
   // Lives across rebuilds so a sign-in in progress survives a settings save.
   const spotifyAuth = createSpotifyAuth({ config, fetchImpl, now, file: path.join(config.dataDir, 'spotify.json'), demo: config.demo });
   let sources;
   let nowPlaying;
+  let localPlayer;
   let lb;
   let letterboxd;
   const cached = (name, load, extra = {}) =>
@@ -173,6 +175,12 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
     lb = () => lbLoad();
     letterboxd = () => lboxdLoad();
     nowPlaying = createNowPlayingFetcher({ config, fetchImpl });
+    // "On this PC" (tests pass their own; demo mode makes songs up).
+    localPlayer = localPlayerFactory
+      ? localPlayerFactory(config)
+      : config.demo
+        ? createDemoLocalPlayer({ now })
+        : createLocalPlayer({ enabled: config.localPlayer.enabled, inContainer, fetchImpl, now });
   };
   build();
 
@@ -370,6 +378,20 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
       } catch (err) {
         return sendJson(res, 200, { status: 'error', nowPlaying: null, error: safeMessage(err) });
       }
+    }
+    // What a player on this computer is playing (no cache beyond ~1.5 s). Always 200.
+    if (p === '/api/local/now-playing') {
+      try {
+        return sendJson(res, 200, await localPlayer.read());
+      } catch {
+        return sendJson(res, 200, { status: 'error', playing: null });
+      }
+    }
+    // That song's album art, by the key the now-playing answer gave. The player's own link never leaves the server.
+    if (p === '/api/local/art') {
+      const image = await localPlayer.art(url.searchParams.get('k')).catch(() => null);
+      if (!image) return send(res, 404, 'not found', { 'content-type': 'text/plain' });
+      return send(res, 200, image.body, { 'content-type': image.type, 'cache-control': 'private, max-age=3600', 'content-security-policy': IMAGE_CSP });
     }
     const sourceMatch = p.match(/^\/api\/([a-z]+)$/);
     if (sourceMatch && Object.hasOwn(sources, sourceMatch[1])) return sendJson(res, 200, await sources[sourceMatch[1]].get());

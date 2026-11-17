@@ -289,6 +289,27 @@ function nowPlayingBlock(np, large = false) {
 </div>`;
 }
 
+/**
+ * "On this PC": the song a player on the dashboard's computer is playing.
+ * Skipped when it's the same song the music service already shows.
+ */
+export function localPlayingBlock(local, serviceNowPlaying, large = false) {
+  const t = local?.playing;
+  if (!t || typeof t.title !== 'string' || !t.title) return '';
+  const same = (a, b) => String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
+  if (serviceNowPlaying && same(serviceNowPlaying.title, t.title) && same(serviceNowPlaying.artist, t.artist)) return '';
+  // Only pupboard's own picture addresses are used (the server never sends a player's link).
+  const art = typeof t.art === 'string' && /^\/api\/(?:local\/art\?k=[0-9a-f]{1,64}|demo-art\/[A-Za-z0-9_-]+\?[a-z0-9=&]*)$/.test(t.art) ? t.art : '';
+  return `<div class="local-playing ${large ? 'local-playing-lg' : ''}" data-anim>
+  ${img(art, t.album || t.title, 'local-cover')}
+  <div class="np-text">
+    <div class="np-label"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>On this PC</span>${t.player ? ` · ${e(t.player)}` : ''}</div>
+    <div class="np-title">${e(t.title)}</div>
+    ${t.artist || t.album ? `<div class="muted small">${e(t.artist ?? '')}${t.album ? `${t.artist ? ' — ' : ''}${e(t.album)}` : ''}</div>` : ''}
+  </div>
+</div>`;
+}
+
 function trackRows(tracks, limit, now) {
   return tracks
     .slice(0, limit)
@@ -316,12 +337,13 @@ function musicNumbers(d) {
   return { s, known, tracks, minutes, atLeast };
 }
 
-export function musicGlance(key, env, now = Date.now()) {
+export function musicGlance(key, env, now = Date.now(), local = null) {
   const d = env?.data;
-  if (!d) return cardShell(key, env, emptyState(key, env), now);
+  if (!d) return cardShell(key, env, localPlayingBlock(local, null) + emptyState(key, env), now);
   const { s, tracks, minutes, atLeast } = musicNumbers(d);
   const top = s.topArtists?.[0];
   const body = `${nowPlayingBlock(d.nowPlaying?.[0])}
+${localPlayingBlock(local, d.nowPlaying?.[0])}
 <div class="stats">
   ${stat('Tracks this week', tracks)}
   ${stat('Listening time', minutes, s.minutesKnown === false ? 'track lengths unknown' : atLeast)}
@@ -342,10 +364,10 @@ function rankList(items, labelFn, cls) {
     .join('')}</ol>`;
 }
 
-export function musicDetail(key, env, now = Date.now()) {
+export function musicDetail(key, env, now = Date.now(), local = null) {
   const d = env?.data;
   const head = pageHead(key, 'Music', env, now);
-  if (!d) return head + emptyState(key, env);
+  if (!d) return head + localPlayingBlock(local, null, true) + emptyState(key, env);
   const { s, known, tracks, minutes, atLeast } = musicNumbers(d);
   const nowPlaying = (d.nowPlaying ?? []).map((np) => nowPlayingBlock(np, true)).join('');
   const albumGrid = (albums) =>
@@ -369,6 +391,7 @@ export function musicDetail(key, env, now = Date.now()) {
 
   return `${head}
 ${nowPlaying}
+${localPlayingBlock(local, d.nowPlaying?.[0], true)}
 <section class="stats stats-wide">
   ${stat('Tracks this week', tracks)}
   ${stat('Listening time', minutes, s.minutesKnown === false ? 'track lengths unknown' : atLeast)}
@@ -669,17 +692,17 @@ function warningsNote(d) {
 }
 
 const GLANCE = {
-  navidrome: (env, now) => musicGlance('navidrome', env, now),
-  spotify: (env, now) => musicGlance('spotify', env, now),
-  listenbrainz: (env, now) => musicGlance('listenbrainz', env, now),
+  navidrome: (env, now, local) => musicGlance('navidrome', env, now, local),
+  spotify: (env, now, local) => musicGlance('spotify', env, now, local),
+  listenbrainz: (env, now, local) => musicGlance('listenbrainz', env, now, local),
   jellyfin: jellyfinGlance,
   letterboxd: letterboxdGlance,
   deals: dealsGlance,
 };
 const DETAIL = {
-  navidrome: (env, now) => musicDetail('navidrome', env, now),
-  spotify: (env, now) => musicDetail('spotify', env, now),
-  listenbrainz: (env, now) => musicDetail('listenbrainz', env, now),
+  navidrome: (env, now, local) => musicDetail('navidrome', env, now, local),
+  spotify: (env, now, local) => musicDetail('spotify', env, now, local),
+  listenbrainz: (env, now, local) => musicDetail('listenbrainz', env, now, local),
   jellyfin: jellyfinDetail,
   letterboxd: letterboxdDetail,
   deals: dealsDetail,
@@ -698,7 +721,7 @@ export function overview(summary, now = Date.now()) {
   const slots = slotsOf(summary);
   return `<section class="grid">
 ${steamGlance(summary?.steam, now)}
-${GLANCE[slots.music](summary?.[slots.music], now)}
+${GLANCE[slots.music](summary?.[slots.music], now, summary?.local)}
 ${GLANCE[slots.media](summary?.[slots.media], now)}
 ${rssGlance(summary?.rss, now)}
 </section>`;
@@ -708,7 +731,7 @@ ${rssGlance(summary?.rss, now)}
 export const ROUTES = {
   '': { key: null, render: (s, now) => overview(s, now) },
   gaming: { key: 'steam', render: (s, now) => steamDetail(s?.steam, now) },
-  music: { key: 'navidrome', render: (s, now) => DETAIL[slotsOf(s).music](s?.[slotsOf(s).music], now) },
+  music: { key: 'navidrome', render: (s, now) => DETAIL[slotsOf(s).music](s?.[slotsOf(s).music], now, s?.local) },
   media: { key: 'jellyfin', render: (s, now) => DETAIL[slotsOf(s).media](s?.[slotsOf(s).media], now) },
   news: { key: 'rss', render: (s, now) => rssDetail(s?.rss, now) },
 };

@@ -22,7 +22,7 @@ const PHRASES = {
   'Films this month': '今月の映画', 'last 30 days': '過去30日', 'Average rating': '平均評価', 'of rated films': '評価した映画', Liked: 'いいね', 'recent films': '最近の映画',
   'track lengths unknown': '曲の長さ不明',
   // headings
-  'Now playing': '再生中', 'Top artists this week': '今週のトップアーティスト', 'Top albums this week': '今週のトップアルバム', 'Top genres this week': '今週のトップジャンル',
+  'Now playing': '再生中', 'On this PC': 'このPCで再生中', 'Top artists this week': '今週のトップアーティスト', 'Top albums this week': '今週のトップアルバム', 'Top genres this week': '今週のトップジャンル',
   'Recently played': '最近再生した曲', 'Most played songs (all time)': 'よく聴く曲（全期間）', 'Your top songs (last 4 weeks)': 'あなたのトップ曲（過去4週間）',
   'Recently played albums': '最近再生したアルバム', 'Most played albums': 'よく聴くアルバム', 'Recently added movies': '最近追加された映画',
   'Recently added episodes': '最近追加されたエピソード', 'Latest from all feeds': 'すべてのフィードの最新記事', 'Free to keep': '無料でもらえる',

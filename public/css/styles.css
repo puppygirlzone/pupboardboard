@@ -260,6 +260,14 @@ img[data-fallback] { background: var(--track); color: transparent; }
 .now-playing { display: flex; gap: 14px; align-items: center; padding: 12px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--music) 9%, transparent); border: 1px solid color-mix(in srgb, var(--music) 22%, transparent); }
 .now-playing .cover { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; flex: none; box-shadow: var(--shadow); }
 .now-playing-lg { margin-bottom: 14px; padding: 18px; }
+/* "On this PC": a quieter strip under (or instead of) the service's now playing. */
+.local-playing { display: flex; gap: 12px; align-items: center; padding: 8px 10px; margin-top: 8px; border-radius: var(--radius-sm); border: 1px dashed color-mix(in srgb, var(--music) 35%, transparent); }
+.local-playing:first-child { margin-top: 0; }
+.local-playing .local-cover { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; flex: none; }
+.local-playing .np-text { min-width: 0; }
+.local-playing .np-title { font-size: 0.95rem; }
+.local-playing-lg { margin-bottom: 14px; padding: 12px 14px; }
+.local-playing-lg .local-cover { width: 64px; height: 64px; }
 .now-playing-lg .cover { width: 110px; height: 110px; }
 .np-text { min-width: 0; }
 .np-label { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--music-ink); font-weight: 700; }

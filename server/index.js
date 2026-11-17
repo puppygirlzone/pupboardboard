@@ -19,7 +19,7 @@ const inContainer = existsSync('/.dockerenv') || existsSync('/run/.containerenv'
 if (inContainer) config.setupEnabled = false;
 // A fresh code every start: the setup page only works with it.
 const setup = { code: randomBytes(16).toString('hex'), env, file: settingsFile };
-const { server, warm } = createApp({ config, fetchImpl, setup });
+const { server, warm } = createApp({ config, fetchImpl, setup, inContainer });
 
 process.on('unhandledRejection', (err) => console.error('[process] unhandled rejection', err));
 

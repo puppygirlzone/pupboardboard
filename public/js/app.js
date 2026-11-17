@@ -7,7 +7,7 @@ import { initThemeControls } from './theme-controls.js';
 import { initMenu } from './menu.js';
 import { initPuppyMode, activeEgg } from './puppy-mode.js';
 import { startBackdrop } from './backdrop.js';
-import { mergeNowPlaying, fetchNowPlaying } from './live.js';
+import { mergeNowPlaying, fetchNowPlaying, mergeLocal, fetchLocalPlaying } from './live.js';
 import { EGGS, eggGreeting, eggVerb } from './eggs.js';
 import { steamImageUrls, createImageWarmer } from './images.js';
 
@@ -83,11 +83,12 @@ function offlineCopy(saved) {
 
 async function load({ animate }) {
   clearTimeout(refreshTimer);
-  // Ask Navidrome for the current song at the same time (never cached).
+  // Ask Navidrome, and any player on this computer, for the current song at the same time (never cached).
   const live = fetchNowPlaying(2500);
+  const local = fetchLocalPlaying(2500);
   let next;
   try {
-    next = mergeNowPlaying(await fetchSummary(), await live);
+    next = mergeLocal(mergeNowPlaying(await fetchSummary(), await live), await local);
     serverOffline = false;
     lastSuccess = Date.now();
     // Remember the good parts for when the server is down.
@@ -178,10 +179,10 @@ let navigation = 0;
 window.addEventListener('hashchange', async () => {
   const id = ++navigation;
   // Fetch the current song while the old page fades out.
-  const [live] = await Promise.all([fetchNowPlaying(800), leave(view)]);
+  const [live, local] = await Promise.all([fetchNowPlaying(800), fetchLocalPlaying(800), leave(view)]);
   if (id !== navigation) return;
   if (!serverOffline && summary) {
-    summary = mergeNowPlaying(summary, live);
+    summary = mergeLocal(mergeNowPlaying(summary, live), local);
     lastPayload = JSON.stringify(summary);
   }
   render(true);

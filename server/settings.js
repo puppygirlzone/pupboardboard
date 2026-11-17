@@ -25,6 +25,7 @@ export const SETTINGS_FIELDS = [
   { key: 'STEAM_LINKS', section: 'steam', label: 'Clicking a game’s name', choices: ['launch', 'store'] },
   { key: 'STEAM_HIDE', section: 'steam', label: 'Don’t count these apps (names or app IDs, separated by commas)', placeholder: `${DEFAULT_STEAM_HIDE.join(', ')} (the default)` },
   { key: 'MUSIC_SOURCE', section: 'music', label: 'Show on the Music card', choices: ['auto', ...MUSIC_SOURCES] },
+  { key: 'LOCAL_NOW_PLAYING', section: 'music', label: 'Also show what’s playing on this computer', choices: ['off', 'on'] },
   {
     key: 'LISTENBRAINZ_USER',
     section: 'listenbrainz',

@@ -8,6 +8,7 @@ Everything here can be set on the **Settings** page (gear button, top right) or 
 - [News feeds](#news-feeds)
 - [Which service shows on a card](#which-service-shows-on-a-card)
 - [Spotify direct](#spotify-direct)
+- [What's playing on this computer](#whats-playing-on-this-computer)
 - [Opening it on your phone](#opening-it-on-your-phone)
 - [All settings](#all-settings)
 
@@ -69,6 +70,19 @@ And ya done! pupboard keeps the sign-in on your computer and refreshes it by its
 
 This needs the Settings page, so it works with the download and `npm start`, but not inside Docker. Docker folks: use ListenBrainz.
 
+## What's playing on this computer
+
+Turn on "Also show what's playing on this computer" in Settings (or `LOCAL_NOW_PLAYING=on` in `.env`) and the Music card gets an extra **On this PC** line with the song, artist and album art from a music player on your computer: Spotify, VLC, Strawberry, Feishin, a browser tab, and so on.
+
+It sits next to your music service rather than replacing it, so your weekly stats still come from Navidrome, ListenBrainz or Spotify. If your service already shows the same song, the extra line hides itself.
+
+- Works on **Linux** (any player that supports MPRIS, which is nearly all of them) and **Windows** (anything that shows up in the volume pop-up's media controls).
+- Only when pupboard runs on the **same computer** as the music: the download or `npm start`. Inside Docker it can't see your music player, so it says so.
+- Not on macOS yet.
+- Anyone who can open your dashboard can see what you're playing. The download only listens on your own computer unless you change that.
+
+**Want stats from your local player too?** Most players can send your plays to ListenBrainz ("scrobbling"), which pupboard already reads: foobar2000 and MusicBee have plugins, Linux has MPRIS scrobblers such as `rescrobbled`, and browser extensions like Web Scrobbler cover music sites. Then set the Music card to ListenBrainz.
+
 ## Opening it on your phone
 
 In Settings → Network, choose "Any device on my home network", save, and restart pupboard. Then open `http://<your computer's IP>:8742` on your phone.
@@ -86,6 +100,7 @@ With Docker it's reachable on your network already: `http://<server-ip>:8742`.
 | `TIME_ZONE` | your browser's zone | Time zone for the clock, date and greeting |
 | `CLOCK_FORMAT` | `24h` | `12h` for a 12-hour clock |
 | `MUSIC_SOURCE`, `MEDIA_SOURCE` | `auto` | Which service fills the Music / Media card |
+| `LOCAL_NOW_PLAYING` | `off` | `on` adds what's playing on this computer to the Music card |
 | `DEALS` | `on` | `off` hides game deals |
 | `DEALS_CURRENCY` | `USD` | `AUD` or `GBP` for deal prices |
 | `SETUP_PAGE` | `1` | `0` turns the Settings page off |

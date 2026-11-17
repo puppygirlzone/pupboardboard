@@ -6,6 +6,9 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+### Added
+- Music: an optional **On this PC** line shows the song a music player on your computer is playing, with its album art (Linux and Windows, when pupboard runs on that computer). Turn it on in Settings → Music card, or `LOCAL_NOW_PLAYING=on`. Your stats still come from your music service.
+
 ## [1.4.2] - 2026-11-18
 
 ### Fixed

@@ -87,6 +87,8 @@ export function loadConfig(env = process.env) {
       // Prices in US dollars, Australian dollars or pounds.
       currency: ['USD', 'AUD', 'GBP'].includes(str(env.DEALS_CURRENCY).toUpperCase()) ? str(env.DEALS_CURRENCY).toUpperCase() : 'USD',
     },
+    // "On this PC": what a music player on this computer is playing (off by default).
+    localPlayer: { enabled: truthy(env.LOCAL_NOW_PLAYING) },
     // Which source fills the Music and Media cards ("auto" = first one set up).
     slots: {
       music: oneOf(env.MUSIC_SOURCE, MUSIC_SOURCES),
@@ -103,6 +105,7 @@ export function loadConfig(env = process.env) {
     config.spotify = { ...config.spotify, clientId: '0123456789abcdef0123456789abcdef', isConnected: () => true };
     config.letterboxd = { ...config.letterboxd, user: 'demo' };
     config.deals = { ...config.deals, enabled: true };
+    config.localPlayer = { enabled: true };
     config.rss = {
       ...config.rss,
       demoFeeds: [

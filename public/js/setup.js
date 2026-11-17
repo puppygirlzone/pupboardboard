@@ -20,7 +20,14 @@ const SECTIONS = [
       ' (for “Domain name” anything works, e.g. localhost). In Steam, set your profile’s “Game details” privacy to Public. Some apps Steam calls games just run in the background (like Soundpad or Bongo Cat); list them under “Don’t count these apps” to keep them out of your hours. Type “none” to count everything.',
     ],
   },
-  { id: 'music', title: 'Music card', help: ['Which service the Music card shows. “Automatic” uses the first one below that is set up.'] },
+  {
+    id: 'music',
+    title: 'Music card',
+    help: [
+      'Which service the Music card shows. “Automatic” uses the first one below that is set up. ',
+      'Turn on “what’s playing on this computer” to also see the song from a music player here (Spotify, VLC, Strawberry, a browser…), with its album art. It works on Linux and Windows when pupboard runs on the same computer as the music, not in Docker.',
+    ],
+  },
   {
     id: 'listenbrainz',
     title: 'Spotify, the easy way (ListenBrainz)',
