@@ -1,6 +1,6 @@
 # Plan: "On this PC" now playing
 
-Status: built on the `feature/local-now-playing` branch (2026-11-18), not merged. Album art was added at the user's request: the player's link stays on the server and the page gets `/api/local/art?k=<hash>` (see AGENTS.md).
+Status: shipped in 1.5.0 (2026-11-18); tested on Linux (Feishin, Strawberry) and on Windows by Bird. Album art was added at the user's request: the player's link stays on the server and the page gets `/api/local/art?k=<hash>` (see AGENTS.md).
 
 ## The idea
 

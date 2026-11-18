@@ -107,6 +107,7 @@ What we're working on, and what's already done:
 
 - [ ] A nicer launcher window for the downloads, instead of a plain black command prompt or terminal window.
 - [ ] Start pupboard automatically when the computer boots, on Windows and Linux.
+- [x] ~~Show what's playing on your own computer ("On this PC"), with album art.~~
 - [x] ~~Click a game's name to launch it in Steam (or open its store page).~~
 - [x] ~~Keep background apps like Soundpad and Bongo Cat out of your gaming hours.~~
 - [x] ~~Smoother, less pixelated text.~~

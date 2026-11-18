@@ -6,6 +6,10 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-18
+
+Thanks to Bird for testing "On this PC" on Windows.
+
 ### Added
 - Music: an optional **On this PC** line shows the song a music player on your computer is playing, with its album art (Linux and Windows, when pupboard runs on that computer). Turn it on in Settings → Music card, or `LOCAL_NOW_PLAYING=on`. Your stats still come from your music service.
 
@@ -92,7 +96,8 @@ First public release.
 - **Docker image** on ghcr.io (amd64 and arm64), with Compose and Dockge support.
 - Copes with unreliable services: timeouts, retries, cached data marked **Offline** or **Partial**, and "—" instead of a misleading 0.
 
-[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.3.1...v1.4.0
