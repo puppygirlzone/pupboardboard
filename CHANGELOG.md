@@ -9,6 +9,10 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 ### Added
 - Gaming: **Roblox**. Each Roblox experience you play shows up next to your Steam games, with how long you played it this week, in the list and the donut chart. If Roblox runs on the same computer as pupboard (Windows, macOS, or Sober on Linux), just add your profile link in Settings → Gaming (Roblox). To count play on your phone or console too, add a Roblox login cookie (see docs/Customise.md). Roblox keeps no play history, so counting starts when you set it up.
 
+### Changed
+- The Settings page is split into tabs (Gaming, Music, Media, News and General) instead of one long scroll. Each tab is named after the dashboard card it changes. One **Save all** button, always in reach at the bottom, saves every tab at once; tabs with unsaved changes get a dot, and if something needs fixing the page opens that tab and puts the cursor in the field. The page remembers the tab you were on.
+- Settings: the Music card's help now says the real order “Automatic” picks services in (Navidrome, then Spotify direct, then ListenBrainz).
+
 ## [1.5.0] - 2026-11-18
 
 Thanks to Bird for testing "On this PC" on Windows.
