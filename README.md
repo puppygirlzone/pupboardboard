@@ -14,7 +14,7 @@ A colourful, animated homepage that shows your week at a glance: what you played
 
 ## What's on it
 
-- 🎮 **Gaming:** hours played on Steam this week, and which games (click one to launch it in Steam, or open its store page if you prefer)
+- 🎮 **Gaming:** hours played this week and which games, from **Steam** and every **Roblox** experience you play, side by side in one donut (click a Steam game to launch it, or open its store page if you prefer)
 - 🎵 **Music:** now playing, top artists and songs, and listening time, from **Spotify** (through ListenBrainz) or your own **Navidrome**
 - 🎬 **Media:** free games and the best Steam sales, films you've logged on **Letterboxd**, or what's new on your **Jellyfin** server
 - 📰 **News:** gaming news out of the box, or any RSS/Atom feeds you like
@@ -25,7 +25,7 @@ It's also pretty: a dot grid that ripples behind everything, numbers that count 
 
 It doesn't fall over either. If one of your services goes down, its card keeps showing the last thing it knew and says so, and the rest of the page carries on. ([How that works](docs/Services.md))
 
-**Free, and as few keys as possible.** News and game deals work with no setup at all. ListenBrainz and Letterboxd only need a username. Only Steam needs a key, and it's free. No paid APIs, no tracking, and your keys stay on your machine.
+**Free, and as few keys as possible.** News and game deals work with no setup at all. ListenBrainz and Letterboxd only need a username, and Roblox just your profile link. Only Steam needs a key, and it's free. No paid APIs, no tracking, and your keys stay on your machine.
 
 ## Getting it running
 
@@ -108,6 +108,8 @@ What we're working on, and what's already done:
 
 - [ ] A nicer launcher window for the downloads, instead of a plain black command prompt or terminal window.
 - [ ] Start pupboard automatically when the computer boots, on Windows and Linux.
+- [x] ~~Roblox on the Gaming card: every experience you play, with how long, next to your Steam games.~~
+- [x] ~~A Settings page in tabs (Gaming, Music, Media, News, General) instead of one long scroll.~~
 - [x] ~~Show what's playing on your own computer ("On this PC"), with album art.~~
 - [x] ~~Click a game's name to launch it in Steam (or open its store page).~~
 - [x] ~~Keep background apps like Soundpad and Bongo Cat out of your gaming hours.~~
@@ -133,4 +135,4 @@ pupboard is free software under the [GNU GPL v3 or later](LICENSE).
 
 It bundles [Monoid](https://github.com/larsenwork/monoid) (MIT / SIL OFL) and [anime.js](https://animejs.com/) (MIT). The download zips include [Node.js](https://nodejs.org) (MIT). Game deals come from [GamerPower](https://www.gamerpower.com), [CheapShark](https://www.cheapshark.com), Steam, GOG and Epic, with exchange rates from [Frankfurter](https://frankfurter.dev). Cover art for ListenBrainz plays comes from the [Cover Art Archive](https://coverartarchive.org).
 
-Not affiliated with Valve, Spotify, ListenBrainz, Letterboxd, Navidrome, Jellyfin, GamerPower or CheapShark.
+Not affiliated with Valve, Roblox, Spotify, ListenBrainz, Letterboxd, Navidrome, Jellyfin, GamerPower or CheapShark.

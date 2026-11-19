@@ -50,7 +50,7 @@ https://www.reddit.com/r/selfhosted/.rss      <- no name: the feed's own title i
 
 ## Which service shows on a card
 
-The Music and Media cards can each show one service. Pick it with "Music card" / "Media card" in Settings, or `MUSIC_SOURCE` / `MEDIA_SOURCE` in `.env`.
+The Music and Media cards can each show one service. Pick it with "Music card" / "Media card" on the Settings page's Music and Media tabs, or `MUSIC_SOURCE` / `MEDIA_SOURCE` in `.env`.
 
 On **Automatic**, the card uses the first one you've set up:
 
@@ -112,7 +112,7 @@ This needs the Settings page, so it works with the download and `npm start`, but
 
 ## What's playing on this computer
 
-Turn on "Also show what's playing on this computer" in Settings (or `LOCAL_NOW_PLAYING=on` in `.env`) and the Music card gets an extra **On this PC** line with the song, artist and album art from a music player on your computer: Spotify, VLC, Strawberry, Feishin, a browser tab, and so on.
+Turn on "Also show what's playing on this computer" in Settings → Music (or `LOCAL_NOW_PLAYING=on` in `.env`) and the Music card gets an extra **On this PC** line with the song, artist and album art from a music player on your computer: Spotify, VLC, Strawberry, Feishin, a browser tab, and so on.
 
 It sits next to your music service rather than replacing it, so your weekly stats still come from Navidrome, ListenBrainz or Spotify. If your service already shows the same song, the extra line hides itself.
 
@@ -125,7 +125,7 @@ It sits next to your music service rather than replacing it, so your weekly stat
 
 ## Opening it on your phone
 
-In Settings → Network, choose "Any device on my home network", save, and restart pupboard. Then open `http://<your computer's IP>:8742` on your phone.
+In Settings → General → Network, choose "Any device on my home network", save, and restart pupboard. Then open `http://<your computer's IP>:8742` on your phone.
 
 With Docker it's reachable on your network already: `http://<server-ip>:8742`.
 

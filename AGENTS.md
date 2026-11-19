@@ -20,7 +20,7 @@ The overview page is the at-a-glance view. Each source has a detail page with mo
 3. **Three ways to run it, all kept working:** `npm start` on Linux/macOS/Windows, Docker Compose (including Dockge), and the double-click release downloads for people who have never used a terminal.
 4. **Tests protect every change.** Add or update tests with every change so later changes can't silently break earlier work.
 5. **Glanceable first.** The overview shows the important numbers at a glance; extra detail goes on the detail pages.
-6. **As few API keys as possible.** Prefer services that need nothing (deals, RSS) or just a username (ListenBrainz, Letterboxd). A key is acceptable only when the service offers no other way (Steam playtime). Accept what people naturally paste (profile links) and turn it into what the API needs.
+6. **As few API keys as possible.** Prefer services that need nothing (deals, RSS) or just a username or profile link (ListenBrainz, Letterboxd, Roblox). A key is acceptable only when the service offers no other way (Steam playtime). Accept what people naturally paste (profile links) and turn it into what the API needs.
 7. **Usable by non-technical people.** Anything a user has to do (set up, update, fix a problem) should be possible without a terminal when they use the release download. Error messages say what to do, in plain words.
 
 ### Definition of done (for any change)
@@ -122,7 +122,7 @@ tests/                     node:test suites (npm test)
 ## Adding a new data source
 
 1. Write `server/sources/<name>.js` with pure normalisers plus a loader that uses `settleAll(tasks, memory)`.
-2. Add config and an `isConfigured` check in `config.js`, fields in `SETTINGS_FIELDS` (`server/settings.js`) and a section in `public/js/setup.js`, and document the settings in `.env.example` and `docs/Customise.md` (the README only gets a row in "Connecting your stuff").
+2. Add config and an `isConfigured` check in `config.js`, fields in `SETTINGS_FIELDS` (`server/settings.js`) a section in `public/js/setup.js` and its id in a tab's `sections` in `public/js/setup-tabs.js` (`TABS`), and document the settings in `.env.example` and `docs/Customise.md` (the README only gets a row in "Connecting your stuff").
 3. Register it in `server/app.js` (`sources`), and add invented fake responses to `server/demo/fake-upstreams.js`.
 4. Add glance and detail renderers in `views.js` and a `SOURCES` entry. For a new card, add a route, a nav link and an accent token in every theme block; for a source that fills an existing slot, add it to `MUSIC_SOURCES`/`MEDIA_SOURCES`, the `GLANCE`/`DETAIL` maps and `slotsOf`, and reuse the slot's accent.
 5. Add tests: parsing (including junk and partial data), the loader with partial failures, rendering in every state, escaping, and settings validation.
