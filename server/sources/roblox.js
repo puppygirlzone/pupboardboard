@@ -292,9 +292,11 @@ export function createRobloxTracker({ config, fetchImpl, history, logReader = nu
             : 'Roblox needs a login cookie (Settings → Roblox) to see which experience you’re in.',
         );
       }
-      if (cookie && lastPoll.error && !methods.logs) throw lastPoll.error;
-
       const state = await history.current();
+      // A failed check only hides the card when the cookie is refused or there is no
+      // history yet (anything else would be a misleading 0); otherwise it's a warning.
+      if (cookie && lastPoll.error && !methods.logs && (lastPoll.error.status === 401 || lastPoll.error.status === 403 || state.since == null)) throw lastPoll.error;
+
       await lookUpUniverses(state);
       const week = computeRobloxWeek(state, now());
       const ids = [...new Set(Object.values(week.perExperience).map((v) => v.universeId).filter(okId))].slice(0, 50);

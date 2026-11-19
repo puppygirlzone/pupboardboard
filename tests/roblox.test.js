@@ -368,6 +368,25 @@ test('tracker: names failing still shows time (with a fallback name and a warnin
   }
 });
 
+test('tracker: one failed check keeps showing the history (with a warning); none at all is an error', async () => {
+  const { dir, cleanup } = await tempDir();
+  try {
+    const down = stubFetch([[has('presence.roblox.com'), () => new Response('oops', { status: 500 })], ...robloxRoutes()]);
+    const empty = createRobloxTracker({ config: trackerConfig({ cookie: COOKIE, user: '7' }), fetchImpl: down, history: createRobloxHistory({ dataDir: dir }), now: () => NOW });
+    await assert.rejects(empty.load(), /HTTP 500/);
+
+    const history = createRobloxHistory({ dataDir: dir });
+    await history.markTracking(NOW - DAY);
+    for (let i = 0; i <= 20; i++) await history.addPresence({ at: NOW - 3_600_000 + i * MIN, placeId: 500, universeId: 50, pollMs: MIN });
+    const tracker = createRobloxTracker({ config: trackerConfig({ cookie: COOKIE, user: '7' }), fetchImpl: down, history, now: () => NOW });
+    const d = await tracker.load();
+    assert.equal(d.games[0].minutes, 21);
+    assert.ok(d.warnings.some((w) => w.startsWith('presence:')));
+  } finally {
+    await cleanup();
+  }
+});
+
 test('presence answers: junk is ignored', () => {
   assert.equal(normalizePresence(null, 1), null);
   assert.equal(normalizePresence({ userPresences: 'x' }, 1), null);
