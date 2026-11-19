@@ -11,6 +11,9 @@ import { readSettings, writeSettings, mergeSettings, describeSettings, applyChan
 import { createCachedSource, hostOf, safeMessage, readCapped } from './resilience.js';
 import { createSteamLoader } from './sources/steam.js';
 import { createSteamHistory } from './sources/steam-history.js';
+import { createRobloxTracker } from './sources/roblox.js';
+import { createRobloxHistory } from './sources/roblox-history.js';
+import { createRobloxLogReader } from './sources/roblox-logs.js';
 import { createNavidromeLoader, createNowPlayingFetcher, navidromeCoverUrl } from './sources/navidrome.js';
 import { createJellyfinLoader, jellyfinImageUrl, jellyfinHeaders } from './sources/jellyfin.js';
 import { createRssLoader } from './sources/rss.js';
@@ -19,7 +22,7 @@ import { createSpotifyAuth, createSpotifyLoader } from './sources/spotify.js';
 import { createDealsLoader } from './sources/deals.js';
 import { createLetterboxdLoader } from './sources/letterboxd.js';
 import { createLocalPlayer, createDemoLocalPlayer } from './sources/local-player.js';
-import { demoArtSvg } from './demo/fake-upstreams.js';
+import { demoArtSvg, demoRobloxHistory } from './demo/fake-upstreams.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -110,13 +113,19 @@ function readBody(req, limit) {
  * setup (optional): { code, env, file } enables the /setup page's API.
  *   code: secret printed at startup; env: the real environment; file: settings.json path.
  */
-const activeNames = (slots) => [...new Set(['steam', slots.music, slots.media, 'rss'])];
+// Roblox shares the Gaming card with Steam.
+const activeNames = (slots) => [...new Set(['steam', 'roblox', slots.music, slots.media, 'rss'])];
 
-export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, retryDelayMs = 300, summaryBudgetMs = 4000, setup = null, inContainer = false, localPlayerFactory = null }) {
+export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, retryDelayMs = 300, summaryBudgetMs = 4000, setup = null, inContainer = false, localPlayerFactory = null, robloxLogReaderFactory = null }) {
   // Callers (tests, older configs) may leave out the newer sections: fill in defaults.
   const defaults = loadConfig({ RSS_FEEDS: 'off' });
-  for (const key of ['listenbrainz', 'spotify', 'letterboxd', 'deals', 'slots', 'localPlayer']) config[key] ??= defaults[key];
+  for (const key of ['listenbrainz', 'spotify', 'letterboxd', 'deals', 'slots', 'localPlayer', 'roblox']) config[key] ??= defaults[key];
   const history = createSteamHistory({ dataDir: config.dataDir, fileName: config.demo ? 'steam-history.demo.json' : 'steam-history.json' });
+  const robloxHistory = createRobloxHistory({
+    dataDir: config.dataDir,
+    fileName: config.demo ? 'roblox-history.demo.json' : 'roblox-history.json',
+    seed: config.demo ? () => demoRobloxHistory(now()) : null,
+  });
   const common = { config, fetchImpl, now };
   // Lives across rebuilds so a sign-in in progress survives a settings save.
   const spotifyAuth = createSpotifyAuth({ config, fetchImpl, now, file: path.join(config.dataDir, 'spotify.json'), demo: config.demo });
@@ -125,6 +134,7 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
   let localPlayer;
   let lb;
   let letterboxd;
+  let roblox = null;
   const cached = (name, load, extra = {}) =>
     createCachedSource({ name, ttlMs: config[name].ttlMs, isConfigured: () => isConfigured[name](config), load, now, retryDelayMs, ...extra });
   // Built again when the setup page saves new settings.
@@ -164,6 +174,7 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
         now,
         retryDelayMs,
       }),
+      roblox: cached('roblox', () => roblox.load()),
       listenbrainz: cached('listenbrainz', (...a) => lb(...a)),
       spotify: cached('spotify', createSpotifyLoader({ ...common, auth: spotifyAuth })),
       letterboxd: cached('letterboxd', (...a) => letterboxd(...a)),
@@ -173,6 +184,10 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
     const lbLoad = config.listenbrainz.user ? createListenBrainzLoader(common) : null;
     const lboxdLoad = config.letterboxd.user ? createLetterboxdLoader(common) : null;
     lb = () => lbLoad();
+    // Roblox log files: only on the computer running pupboard (or a folder mounted into Docker).
+    const logsOn = config.roblox.logs !== 'off' && !config.demo && (!inContainer || Boolean(config.roblox.logDir));
+    const logReader = !logsOn ? null : robloxLogReaderFactory ? robloxLogReaderFactory(config) : createRobloxLogReader({ customDir: config.roblox.logDir, now });
+    roblox = isConfigured.roblox(config) ? createRobloxTracker({ ...common, history: robloxHistory, logReader }) : null;
     letterboxd = () => lboxdLoad();
     nowPlaying = createNowPlayingFetcher({ config, fetchImpl });
     // "On this PC" (tests pass their own; demo mode makes songs up).
@@ -439,11 +454,18 @@ export function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now
   /** Refresh the sources on screen (keeps caches warm and Steam history ticking). */
   const warm = () => Promise.all(activeNames(resolveSlots(config)).map((n) => sources[n].get()));
 
+  /**
+   * One Roblox check (index.js runs it every ROBLOX_POLL_SECONDS, whether or
+   * not anyone has the page open). Never throws.
+   */
+  const pollRoblox = () => (roblox ? roblox.poll().catch(() => {}) : Promise.resolve());
+
   return {
     server,
     get sources() {
       return sources;
     },
     warm,
+    pollRoblox,
   };
 }

@@ -25,6 +25,16 @@ const SECTIONS = [
     ],
   },
   {
+    id: 'roblox',
+    title: 'Gaming (Roblox)',
+    help: [
+      'Tracks each Roblox experience you play and for how long, next to your Steam games. Paste your Roblox profile link (or username). ',
+      'If Roblox runs on this computer (Windows, macOS, or Sober on Linux), that’s enough: pupboard reads Roblox’s own log files, no login needed. ',
+      'To also count play on your phone, console or another PC, Roblox needs a login cookie, because it only says which experience you’re in to a logged-in account. Safest is a spare Roblox account that’s friends with you; your own works too. In a browser signed in to roblox.com, press F12, open Application (Firefox: Storage) → Cookies → roblox.com and copy the value of .ROBLOSECURITY. It stays on this computer and is never shown again. ',
+      ['Step-by-step guide', 'https://github.com/puppygirlzone/pupboardboard/blob/main/docs/Customise.md#roblox'],
+    ],
+  },
+  {
     id: 'music',
     title: 'Music card',
     help: [

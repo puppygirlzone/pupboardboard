@@ -21,6 +21,7 @@ You'll never see a fake 0. If a number is unknown because something failed, it s
 Some services only share so much, so here's what each one can and can't tell pupboard:
 
 - **Steam** only reports playtime for the "last 2 weeks". pupboard saves your total playtime once an hour and compares it with a week ago. Until it has 7 days of history, it shows the 2-week figures and says so.
+- **Roblox** keeps no play history at all, so pupboard keeps its own: from Roblox's log files on this computer (exact join and leave times) and, with a login cookie, by checking what you're in every minute while pupboard runs. Counting starts when you set it up, and the card says so until it has a full week.
 - **Navidrome** only remembers the most recent play of each song, so "tracks this week" and "listening time" are minimums. A song played 5 times counts once.
 - **Spotify** only shares your last 50 plays. If all 50 are from this week, the card shows **50+** instead of a made-up total.
 - **ListenBrainz** counts every play, repeats included. If most plays have no track length, listening time shows "—" rather than a number that's too low. "Now playing" depends on your music app reporting it, so it can lag a little.

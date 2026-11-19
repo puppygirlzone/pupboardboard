@@ -57,6 +57,46 @@ On **Automatic**, the card uses the first one you've set up:
 - **Music:** Navidrome, then Spotify, then ListenBrainz
 - **Media:** Jellyfin, then Letterboxd, then game deals
 
+## Roblox
+
+Roblox experiences show up on the Gaming card next to your Steam games: each one gets its own row and its own slice of the donut, with how long you played it this week. Clicking a name asks the Roblox app to join it.
+
+Roblox doesn't keep a play history anyone can read, so pupboard counts it itself. There are two ways, and you can use both:
+
+**1. Roblox on this computer (no login).** If you play Roblox on the computer that runs pupboard, put your profile link in Settings → Gaming (Roblox) and you're done. The Roblox app writes down every time you join or leave an experience, and pupboard reads those notes. This even catches play from before you set it up (as far back as Roblox keeps them) and time when pupboard wasn't running. It looks in:
+
+- **Windows:** `%LOCALAPPDATA%\Roblox\logs` (also used by Bloxstrap and Fishstrap) and the Microsoft Store version's folder
+- **macOS:** `~/Library/Logs/Roblox`
+- **Linux:** Sober's `~/.var/app/org.vinegarhq.Sober/data/sober/sober_logs`
+
+Set `ROBLOX_LOG_DIR` to use another folder, or `ROBLOX_LOGS=off` to not read them. Inside Docker it only reads a folder you mount and point `ROBLOX_LOG_DIR` at.
+
+**2. Any device (needs a login cookie).** To count play on your phone, console or another PC, pupboard asks Roblox what you're in every minute (`ROBLOX_POLL_SECONDS`). Roblox only answers that for a logged-in account, so pupboard needs that account's `.ROBLOSECURITY` cookie.
+
+> [!WARNING]
+> That cookie lets anyone who has it log in as that account. pupboard keeps it on your computer (write-only in Settings, never sent to the browser or written to logs), but the safest choice is a **spare Roblox account** made just for this.
+
+Using a spare account:
+
+1. Make a second, free Roblox account and add it as a friend from your main account.
+2. On your main account, open Roblox **Settings → Privacy** and let **Friends** see your online status and join you in experiences. Roblox renames these now and then. If the card says Roblox won't tell it which experience you're in, this is the setting to check.
+3. Put your main account's profile link in pupboard.
+
+Getting the cookie (from the spare account, or your own if you'd rather):
+
+1. Sign in to [roblox.com](https://www.roblox.com) in a browser with that account.
+2. Press **F12**, open **Application** (Firefox: **Storage**) → **Cookies** → `https://www.roblox.com`.
+3. Copy the value of `.ROBLOSECURITY` (it starts with `_|WARNING`) and paste it into Settings, or into `.env` in single quotes: `ROBLOX_COOKIE='_|WARNING…'`.
+
+Logging that account out of the browser ends the cookie, so close the tab instead. If the cookie stops working, the Gaming card tells you to paste a fresh one.
+
+What to expect:
+
+- Counting starts when you set it up (plus whatever the log files cover). Until there's a week, the card says how long it's been tracking instead of pretending it's a full week.
+- With a cookie, play is only seen while pupboard is running, and times are accurate to about one check (a minute by default).
+- Roblox Studio time isn't counted.
+- All the Roblox requests are free and need no API key.
+
 ## Spotify direct
 
 This gives you live "now playing" straight from Spotify. Spotify only allows it with **Spotify Premium** and your own free developer app (each app allows at most 5 people). If that sounds like too much, use ListenBrainz instead: it only needs a username.
@@ -100,11 +140,13 @@ With Docker it's reachable on your network already: `http://<server-ip>:8742`.
 | `TIME_ZONE` | your browser's zone | Time zone for the clock, date and greeting |
 | `CLOCK_FORMAT` | `24h` | `12h` for a 12-hour clock |
 | `MUSIC_SOURCE`, `MEDIA_SOURCE` | `auto` | Which service fills the Music / Media card |
+| `ROBLOX_LOGS` | `auto` | `off` stops reading Roblox's log files on this computer |
+| `ROBLOX_POLL_SECONDS` | `60` | How often pupboard checks what you're playing on Roblox (with a cookie) |
 | `LOCAL_NOW_PLAYING` | `off` | `on` adds what's playing on this computer to the Music card |
 | `DEALS` | `on` | `off` hides game deals |
 | `DEALS_CURRENCY` | `USD` | `AUD` or `GBP` for deal prices |
 | `SETUP_PAGE` | `1` | `0` turns the Settings page off |
-| `DATA_DIR` | `./data` | Where settings and Steam history are stored |
+| `DATA_DIR` | `./data` | Where settings and Steam and Roblox history are stored |
 | `DEMO_MODE` | `0` | `1` shows made-up data |
 
 > [!NOTE]

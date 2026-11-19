@@ -12,6 +12,7 @@ import { writeFile, rename, mkdir, chmod } from 'node:fs/promises';
 import path from 'node:path';
 import { validTimeZone, MUSIC_SOURCES, MEDIA_SOURCES } from './config.js';
 import { parseSteamProfile, DEFAULT_STEAM_HIDE } from './sources/steam.js';
+import { parseRobloxUser, parseRobloxCookie } from './sources/roblox.js';
 import { validListenBrainzUser } from './sources/listenbrainz.js';
 import { validLetterboxdUser } from './sources/letterboxd.js';
 import { validSpotifyClientId } from './sources/spotify.js';
@@ -24,6 +25,28 @@ export const SETTINGS_FIELDS = [
   { key: 'STEAM_API_KEY', section: 'steam', label: 'Steam Web API key', secret: true },
   { key: 'STEAM_LINKS', section: 'steam', label: 'Clicking a game’s name', choices: ['launch', 'store'] },
   { key: 'STEAM_HIDE', section: 'steam', label: 'Don’t count these apps (names or app IDs, separated by commas)', placeholder: `${DEFAULT_STEAM_HIDE.join(', ')} (the default)` },
+  {
+    key: 'ROBLOX_USER',
+    section: 'roblox',
+    label: 'Roblox profile link or username',
+    check: (v) => (parseRobloxUser(v) ? null : 'should be your profile link, like https://www.roblox.com/users/123456/profile, or your username'),
+  },
+  {
+    key: 'ROBLOX_COOKIE',
+    section: 'roblox',
+    label: 'Roblox login cookie (.ROBLOSECURITY)',
+    secret: true,
+    max: 4100,
+    check: (v) => (parseRobloxCookie(v) ? null : 'doesn’t look like a .ROBLOSECURITY cookie (it starts with _|WARNING)'),
+  },
+  { key: 'ROBLOX_LOGS', section: 'roblox', label: 'Also read Roblox’s log files on this computer', choices: ['auto', 'off'] },
+  {
+    key: 'ROBLOX_POLL_SECONDS',
+    section: 'roblox',
+    label: 'Check what you’re playing every … seconds',
+    placeholder: '60 (the default)',
+    check: (v) => (/^\d{1,4}$/.test(v) && Number(v) >= 30 && Number(v) <= 3600 ? null : 'should be a number of seconds from 30 to 3600'),
+  },
   { key: 'MUSIC_SOURCE', section: 'music', label: 'Show on the Music card', choices: ['auto', ...MUSIC_SOURCES] },
   { key: 'LOCAL_NOW_PLAYING', section: 'music', label: 'Also show what’s playing on this computer', choices: ['off', 'on'] },
   {
@@ -70,7 +93,7 @@ export function readSettings(file) {
   }
   const out = {};
   for (const [k, v] of Object.entries(parsed && typeof parsed === 'object' ? parsed : {})) {
-    if (BY_KEY.has(k) && typeof v === 'string' && v.length <= MAX_VALUE) out[k] = v;
+    if (BY_KEY.has(k) && typeof v === 'string' && v.length <= (BY_KEY.get(k).max ?? MAX_VALUE)) out[k] = v;
   }
   return out;
 }
@@ -124,7 +147,7 @@ const isHttpUrl = (v) => {
 
 function checkValue(field, value) {
   if (value === '') return null;
-  if (value.length > MAX_VALUE) return 'is too long';
+  if (value.length > (field.max ?? MAX_VALUE)) return 'is too long';
   if (/[\r\n\0]/.test(value)) return 'must be a single line';
   if (field.url && !isHttpUrl(value)) return 'must start with http:// or https:// (for example http://192.168.1.10:4533)';
   if (field.choices && !field.choices.includes(value)) return 'is not one of the options';
