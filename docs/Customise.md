@@ -1,6 +1,6 @@
 # Customising pupboard
 
-Everything here can be set on the **Settings** page (gear button, top right) or in `.env`. If both have a value, `.env` wins. Inside Docker the Settings page is off, so use `.env` there.
+Everything here can be set on the **Settings** page (gear button, top right) or in `.env`. The Settings page has a tab per dashboard card (Gaming, Music, Media, News) plus General for the clock and network. If both have a value, `.env` wins. Inside Docker the Settings page is off, so use `.env` there.
 
 [← Back to the README](../README.md)
 

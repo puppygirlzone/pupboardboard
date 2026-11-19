@@ -6,6 +6,10 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+### Changed
+- The Settings page is split into tabs (Gaming, Music, Media, News and General) instead of one long scroll. Each tab is named after the dashboard card it changes. One **Save all** button, always in reach at the bottom, saves every tab at once; tabs with unsaved changes get a dot, and if something needs fixing the page opens that tab and puts the cursor in the field. The page remembers the tab you were on.
+- Settings: the Music card's help now says the real order “Automatic” picks services in (Navidrome, then Spotify direct, then ListenBrainz).
+
 ## [1.5.0] - 2026-11-18
 
 Thanks to Bird for testing "On this PC" on Windows.

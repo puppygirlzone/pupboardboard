@@ -5,11 +5,15 @@
 // (".../setup.html#code=..."). The code is kept in sessionStorage for reloads
 // and removed from the address bar straight away.
 
+import { groupSections, withFieldSections, startTab, tabForKey, tabsWithErrors, tabOfKey, TABS } from './setup-tabs.js';
+
 const CODE_KEY = 'pupboard:setup-code';
+const TAB_KEY = 'pupboard:setup-tab';
 const $ = (sel) => document.querySelector(sel);
 const statusBox = $('#setup-status');
 const form = $('#setup-form');
 
+// Each section's box; setup-tabs.js says which tab it goes on.
 const SECTIONS = [
   {
     id: 'steam',
@@ -24,7 +28,7 @@ const SECTIONS = [
     id: 'music',
     title: 'Music card',
     help: [
-      'Which service the Music card shows. “Automatic” uses the first one below that is set up. ',
+      'Which service the Music card shows. “Automatic” uses Navidrome if it is set up, then Spotify direct, then ListenBrainz. ',
       'Turn on “what’s playing on this computer” to also see the song from a music player here (Spotify, VLC, Strawberry, a browser…), with its album art. It works on Linux and Windows when pupboard runs on the same computer as the music, not in Docker.',
     ],
   },
@@ -48,18 +52,18 @@ const SECTIONS = [
   },
   {
     id: 'navidrome',
-    title: 'Music (Navidrome)',
+    title: 'Navidrome (your own music server)',
     help: ['For your own music server: the address you open Navidrome at (for example http://192.168.1.10:4533) and your normal Navidrome login.'],
   },
   { id: 'media', title: 'Media card', help: ['Which service the Media card shows. “Automatic” uses Jellyfin if it is set up, then Letterboxd, then game deals.'] },
-  { id: 'deals', title: 'Game deals', help: ['Free-to-keep PC games and the best Steam and GOG sales, in your currency. Nothing else to set up.'] },
-  { id: 'letterboxd', title: 'Films (Letterboxd)', help: ['Films you log on ', ['letterboxd.com', 'https://letterboxd.com'], '. Just your username (or paste your profile link), no keys.'] },
+  { id: 'deals', title: 'Game deals', help: ['Free-to-keep PC games and the best Steam and GOG sales, in your currency, on the Media card. Nothing else to set up.'] },
+  { id: 'letterboxd', title: 'Letterboxd films', help: ['Films you log on ', ['letterboxd.com', 'https://letterboxd.com'], '. Just your username (or paste your profile link), no keys.'] },
   {
     id: 'jellyfin',
-    title: 'Media server (Jellyfin)',
+    title: 'Jellyfin (your own media server)',
     help: ['The address you open Jellyfin at (for example http://192.168.1.10:8096). Make an API key in Jellyfin: Dashboard → API Keys → +.'],
   },
-  { id: 'news', title: 'News (RSS)', help: ['One feed per line, as “Name | https://address-of-the-feed”. Lines starting with # are ignored. Empty = no news card.'] },
+  { id: 'news', title: 'News feeds', help: ['One feed per line, as “Name | https://address-of-the-feed”. Lines starting with # are ignored. Empty = no news card.'] },
   { id: 'clock', title: 'Clock', help: ['Leave the time zone empty to use your browser’s. Set it if the clock shows the wrong time.'] },
   { id: 'network', title: 'Network', help: ['Allow phones and other computers at home to open the dashboard. Takes effect after you restart pupboard.'] },
 ];
@@ -217,7 +221,7 @@ function fieldControl(f, currentHost) {
   const id = `f-${f.key}`;
   let control;
   if (f.choices) {
-    control = el('select', { id, name: f.key, class: 'setup-input', disabled: f.locked });
+    control = el('select', { id, name: f.key, class: 'setup-input', disabled: f.locked, 'aria-describedby': `err-${f.key}` });
     const selected = f.value || (f.key === 'HOST' ? currentHost : f.choices[0]);
     for (const c of f.choices) control.append(el('option', { value: c, text: CHOICE_LABELS[c] ?? c, selected: c === selected }));
   } else {
@@ -229,6 +233,7 @@ function fieldControl(f, currentHost) {
       autocomplete: f.secret ? 'new-password' : 'off',
       spellcheck: 'false',
       value: f.secret ? '' : f.value,
+      'aria-describedby': `err-${f.key}`,
       placeholder: f.secret && f.isSet ? 'Saved (leave empty to keep it)' : f.placeholder ?? '',
       disabled: f.locked,
     });
@@ -252,25 +257,121 @@ function fieldControl(f, currentHost) {
   return el('div', { class: 'setup-field' }, parts);
 }
 
+/* ------------------------------------------------------------ tabs */
+
+// One tab per dashboard card plus General (see setup-tabs.js). All panels stay
+// inside the one form, only hidden, so Save always sends every tab.
+
+let activeTab = null;
+let tabIds = [];
+
+function rememberTab(id) {
+  try {
+    localStorage.setItem(TAB_KEY, id);
+  } catch {
+    /* storage blocked: start on the first tab next time */
+  }
+}
+
+function savedTab() {
+  try {
+    return localStorage.getItem(TAB_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function selectTab(id, { focus = false } = {}) {
+  if (!tabIds.includes(id)) id = tabIds[0];
+  activeTab = id;
+  for (const tab of form.querySelectorAll('[role="tab"]')) {
+    const on = tab.dataset.tab === id;
+    tab.setAttribute('aria-selected', String(on));
+    tab.tabIndex = on ? 0 : -1;
+    if (on && focus) tab.focus();
+  }
+  for (const panel of form.querySelectorAll('[role="tabpanel"]')) panel.hidden = panel.dataset.tab !== id;
+}
+
+// A control differs from what was loaded (uses the browser's own defaults).
+function changed(control) {
+  if (control.type === 'checkbox') return control.checked !== control.defaultChecked;
+  if (control.tagName === 'SELECT') return [...control.options].some((o) => o.selected !== o.defaultSelected);
+  if (control.readOnly || control.type === 'button') return false;
+  return control.value !== control.defaultValue;
+}
+
+// Short words after a tab's name, also read out by screen readers.
+function setTabMarks(tab, { dirty, error }) {
+  tab.classList.toggle('is-dirty', dirty);
+  tab.classList.toggle('has-error', error);
+  const note = tab.querySelector('.setup-tab-note');
+  note.textContent = error ? ' (needs fixing)' : dirty ? ' (not saved yet)' : '';
+}
+
+function updateDirty(panel) {
+  const tab = document.getElementById(`tab-${panel.dataset.tab}`);
+  const dirty = [...panel.querySelectorAll('input, select, textarea')].some(changed);
+  setTabMarks(tab, { dirty, error: tab.classList.contains('has-error') });
+}
+
+function tabRow(groups) {
+  const row = el('div', { class: 'setup-tabs', role: 'tablist', 'aria-label': 'Settings categories' });
+  for (const g of groups) {
+    const tab = el('button', { type: 'button', role: 'tab', id: `tab-${g.id}`, class: `setup-tab setup-tab-${g.accent}`, 'aria-controls': `panel-${g.id}`, 'data-tab': g.id }, [
+      document.createTextNode(g.title),
+      el('span', { class: 'setup-tab-dot', 'aria-hidden': 'true' }),
+      el('span', { class: 'visually-hidden setup-tab-note' }),
+    ]);
+    tab.addEventListener('click', () => {
+      selectTab(g.id);
+      rememberTab(g.id);
+    });
+    row.append(tab);
+  }
+  row.addEventListener('keydown', (event) => {
+    const next = tabForKey(event.key, activeTab, tabIds);
+    if (!next) return;
+    event.preventDefault();
+    selectTab(next, { focus: true });
+    rememberTab(next);
+  });
+  return row;
+}
+
+function sectionBox(section, data) {
+  const box = el('section', { class: `panel setup-section setup-${section.id}`, 'aria-labelledby': `h-${section.id}` }, [el('h2', { id: `h-${section.id}`, text: section.title })]);
+  if (section.help?.length) box.append(helpText(section.help));
+  if (section.id === 'news') {
+    const area = el('textarea', { id: 'f-feeds', name: 'feeds', class: 'setup-input setup-feeds', rows: 7, spellcheck: 'false', 'aria-describedby': 'err-feeds' });
+    area.defaultValue = data.feeds.text;
+    box.append(el('label', { for: 'f-feeds', class: 'visually-hidden', text: 'News feeds' }), area, el('p', { class: 'setup-error small', id: 'err-feeds', hidden: true }));
+  }
+  for (const f of data.fields.filter((x) => x.section === section.id)) box.append(fieldControl(f, data.host));
+  if (section.id === 'spotify') box.append(spotifyBlock(data));
+  if ((section.id === 'music' || section.id === 'media') && data.slots) {
+    box.append(el('p', { class: 'muted small setup-current', text: `Showing now: ${CHOICE_LABELS[data.slots[section.id]] ?? data.slots[section.id]}.` }));
+  }
+  return box;
+}
+
 function render(data) {
   state = data;
-  form.replaceChildren();
-  for (const section of SECTIONS) {
-    const box = el('section', { class: `panel setup-section setup-${section.id}` }, [el('h2', { text: section.title }), helpText(section.help)]);
-    if (section.id === 'news') {
-      const area = el('textarea', { id: 'f-feeds', name: 'feeds', class: 'setup-input setup-feeds', rows: 7, spellcheck: 'false' });
-      area.value = data.feeds.text;
-      box.append(el('label', { for: 'f-feeds', class: 'visually-hidden', text: 'News feeds' }), area, el('p', { class: 'setup-error small', id: 'err-feeds', hidden: true }));
-    }
-    for (const f of data.fields.filter((x) => x.section === section.id)) box.append(fieldControl(f, data.host));
-    if (section.id === 'spotify') box.append(spotifyBlock(data));
-    if ((section.id === 'music' || section.id === 'media') && data.slots) {
-      box.append(el('p', { class: 'muted small setup-current', text: `Showing now: ${CHOICE_LABELS[data.slots[section.id]] ?? data.slots[section.id]}.` }));
-    }
-    form.append(box);
+  const groups = groupSections(withFieldSections(SECTIONS, data.fields));
+  tabIds = groups.map((g) => g.id);
+  form.replaceChildren(tabRow(groups));
+  for (const g of groups) {
+    const panel = el('div', { role: 'tabpanel', id: `panel-${g.id}`, class: 'setup-panel', 'aria-labelledby': `tab-${g.id}`, 'data-tab': g.id }, [
+      el('p', { class: 'muted setup-about', text: g.about }),
+      ...g.sections.map((s) => sectionBox(s, data)),
+    ]);
+    panel.addEventListener('input', () => updateDirty(panel));
+    panel.addEventListener('change', () => updateDirty(panel));
+    form.append(panel);
   }
-  const save = el('button', { type: 'submit', class: 'setup-button setup-save', text: 'Save' });
-  form.append(el('div', { class: 'setup-actions' }, [save]));
+  const save = el('button', { type: 'submit', class: 'setup-button setup-save', text: 'Save all' });
+  form.append(el('div', { class: 'setup-actions' }, [el('p', { class: 'muted small setup-save-note', text: 'Saves the changes in every tab.' }), save]));
+  selectTab(activeTab ?? startTab({ saved: savedTab(), spotifyResult, tabIds }));
   form.hidden = false;
 }
 
@@ -290,32 +391,59 @@ function collect() {
   return body;
 }
 
+// Shows each error under its field, marks the tabs that have one, and opens
+// the first of them with the cursor in the first field to fix.
 function showErrors(errors) {
   form.querySelectorAll('.setup-error').forEach((p) => {
     p.hidden = true;
     p.textContent = '';
   });
+  form.querySelectorAll('[aria-invalid]').forEach((c) => c.removeAttribute('aria-invalid'));
+  const bad = tabsWithErrors(errors, state.fields);
+  for (const tab of form.querySelectorAll('[role="tab"]')) {
+    setTabMarks(tab, { dirty: tab.classList.contains('is-dirty'), error: bad.includes(tab.dataset.tab) });
+  }
+  let first = null;
   for (const err of errors) {
     const slot = err.key && document.getElementById(`err-${err.key}`);
-    if (slot) {
-      slot.textContent = err.message;
-      slot.hidden = false;
-    }
+    if (!slot) continue;
+    slot.textContent = err.message;
+    slot.hidden = false;
+    const control = document.getElementById(`f-${err.key}`);
+    control?.setAttribute('aria-invalid', 'true');
+    if (!first && tabOfKey(err.key, state.fields) === bad[0]) first = control;
   }
+  if (!bad.length) return false;
+  selectTab(bad[0]);
+  if (!first) return false;
+  first.focus();
+  return true;
+}
+
+// "Music: Spotify Client ID should be…", so the message says where to look.
+function errorSummary(errors) {
+  const titles = Object.fromEntries(TABS.map((t) => [t.id, t.title]));
+  return errors
+    .map((e) => {
+      const tab = e.key && tabOfKey(e.key, state.fields);
+      return tab ? `${titles[tab]}: ${e.message}` : e.message;
+    })
+    .join(' · ');
 }
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const button = form.querySelector('.setup-save');
   button.disabled = true;
+  let fieldFocused = false;
   try {
     const res = await api({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(collect()) });
     const out = await res.json().catch(() => ({}));
     if (res.status === 403) return refuse(out.error);
     if (!res.ok) {
       const errors = out.errors ?? [{ key: null, message: 'Saving failed.' }];
-      showErrors(errors);
-      showStatus('error', [el('strong', { text: 'Not saved. ' }), document.createTextNode(errors.map((e) => e.message).join(' · '))]);
+      fieldFocused = showErrors(errors);
+      showStatus('error', [el('strong', { text: 'Not saved. ' }), document.createTextNode(errorSummary(errors))]);
       return;
     }
     showErrors([]);
@@ -324,11 +452,13 @@ form.addEventListener('submit', async (event) => {
     done.push(el('a', { href: '/', class: 'setup-link', text: 'Open the dashboard →' }));
     showStatus('ok', done);
     await load({ quiet: true });
+    form.querySelector('.setup-save')?.focus({ preventScroll: true });
   } catch {
     showStatus('error', 'Couldn’t reach pupboard. Is it still running?');
   } finally {
     button.disabled = false;
-    statusBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // The field to fix is already in view; otherwise show the message.
+    if (!fieldFocused) statusBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 });
 
@@ -350,7 +480,7 @@ async function load({ quiet = false } = {}) {
     if (!res.ok) throw new Error(String(res.status));
     render(await res.json());
     if (!quiet && spotifyResult && SPOTIFY_MESSAGES[spotifyResult]) showStatus(spotifyResult === 'connected' ? 'ok' : 'error', SPOTIFY_MESSAGES[spotifyResult]);
-    else if (!quiet) showStatus('info', 'Fill in what you use, then press Save at the bottom.');
+    else if (!quiet) showStatus('info', 'Fill in what you use in any tab, then press Save all. You don’t need every tab.');
   } catch {
     showStatus('error', 'Couldn’t reach pupboard. Is it still running?');
   }

@@ -465,6 +465,44 @@ p.setup-error { color: var(--err-ink); margin: 4px 0 0; }
 }
 .setup-pill-danger:hover { background: color-mix(in srgb, var(--err) 26%, transparent); }
 .setup-pill-danger:focus-visible { outline: 2px solid var(--err-ink); outline-offset: 2px; }
+/* Settings tabs: one per dashboard card, plus General. The selected tab
+   takes its card's accent colour. Panels fade in (opacity only). */
+.setup-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 14px; padding: 5px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); }
+.setup-tab {
+  --tab-ink: var(--steam-ink);
+  flex: 1 1 auto; font: inherit; font-size: 0.92rem; font-weight: 600; cursor: pointer; color: var(--muted);
+  background: none; border: 1px solid transparent; border-radius: 999px; padding: 8px 14px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+}
+.setup-tab-music { --tab-ink: var(--music-ink); }
+.setup-tab-media { --tab-ink: var(--media-ink); }
+.setup-tab-news { --tab-ink: var(--news-ink); }
+.setup-tab-plain { --tab-ink: var(--text); }
+.setup-tab:hover { color: var(--text); background: var(--tint); }
+.setup-tab[aria-selected="true"] { color: var(--tab-ink); background: color-mix(in srgb, var(--tab-ink) 14%, transparent); border-color: color-mix(in srgb, var(--tab-ink) 45%, transparent); }
+.setup-tab:focus-visible { outline: 2px solid var(--tab-ink); outline-offset: 2px; }
+.setup-tab-dot { display: none; width: 7px; height: 7px; border-radius: 999px; background: var(--warn-ink); }
+.setup-tab.is-dirty .setup-tab-dot { display: inline-block; }
+.setup-tab.has-error { color: var(--err-ink); }
+.setup-tab.has-error .setup-tab-dot { display: inline-block; background: var(--err-ink); }
+.setup-panel:not([hidden]) { animation: setup-panel-in 0.2s ease-out; }
+@keyframes setup-panel-in { from { opacity: 0; } to { opacity: 1; } }
+.setup-about { margin: 0 4px 14px; font-size: 0.9rem; line-height: 1.5; }
+.setup-input[aria-invalid="true"] { border-color: var(--err-ink); }
+.setup-actions {
+  position: sticky; bottom: 12px; z-index: 2; align-items: center; gap: 14px; margin-top: 16px;
+  padding: 10px 10px 10px 18px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow);
+}
+.setup-save-note { margin: 0; }
+.setup-save { flex: none; white-space: nowrap; }
+@media (max-width: 520px) {
+  /* Two even rows (3 + 2, the second row's two tabs wider) instead of one
+     tab left alone on a second row or an empty slot. */
+  .setup-tabs { display: grid; grid-template-columns: repeat(6, 1fr); border-radius: var(--radius-sm); }
+  .setup-tab { grid-column: span 2; padding: 8px 6px; font-size: 0.88rem; }
+  .setup-tab:first-child:nth-last-child(5) ~ .setup-tab:nth-child(n + 4) { grid-column: span 3; }
+  .setup-actions { border-radius: var(--radius-sm); }
+}
 .settings-link {
   display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 999px;
   border: 1px solid var(--border); background: var(--tint); color: var(--muted);
