@@ -6,6 +6,8 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-20
+
 ### Added
 - Gaming: **Roblox**. Each Roblox experience you play shows up next to your Steam games, with how long you played it this week, in the list and the donut chart. If Roblox runs on the same computer as pupboard (Windows, macOS, or Sober on Linux), just add your profile link in Settings → Gaming (Roblox). To count play on your phone or console too, add a Roblox login cookie (see docs/Customise.md). Roblox keeps no play history, so counting starts when you set it up.
 
@@ -103,7 +105,8 @@ First public release.
 - **Docker image** on ghcr.io (amd64 and arm64), with Compose and Dockge support.
 - Copes with unreliable services: timeouts, retries, cached data marked **Offline** or **Partial**, and "—" instead of a misleading 0.
 
-[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.0...v1.4.1
