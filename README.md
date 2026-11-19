@@ -135,4 +135,4 @@ pupboard is free software under the [GNU GPL v3 or later](LICENSE).
 
 It bundles [Monoid](https://github.com/larsenwork/monoid) (MIT / SIL OFL) and [anime.js](https://animejs.com/) (MIT). The download zips include [Node.js](https://nodejs.org) (MIT). Game deals come from [GamerPower](https://www.gamerpower.com), [CheapShark](https://www.cheapshark.com), Steam, GOG and Epic, with exchange rates from [Frankfurter](https://frankfurter.dev). Cover art for ListenBrainz plays comes from the [Cover Art Archive](https://coverartarchive.org).
 
-Not affiliated with Valve, Roblox, Spotify, ListenBrainz, Letterboxd, Navidrome, Jellyfin, GamerPower or CheapShark.
+Not affiliated with Valve, Roblox, Spotify, ListenBrainz, Letterboxd, Navidrome, Jellyfin, GamerPower or CheapShark. Batteries not included.
