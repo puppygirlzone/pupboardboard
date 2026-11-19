@@ -508,3 +508,7 @@ s { text-decoration-thickness: 1px; }
 .egg-prompt button:hover { filter: brightness(1.08); }
 .egg-prompt button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
 @keyframes egg-prompt-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Roblox experiences on the Gaming card */
+.profiles { display: flex; flex-direction: column; gap: 14px; }
+.via-tag { margin-left: 4px; font-size: 0.66rem; vertical-align: middle; }

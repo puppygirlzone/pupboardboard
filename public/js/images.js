@@ -2,19 +2,20 @@
 // boxes. Every page draw makes new <img> tags; holding a decoded copy of
 // each picture in memory lets the browser paint them straight away.
 
-/** Picture URLs (http/https images, or pupboard's own /api/img and /api/demo-art links) found in the Steam part of a summary, deduped, at most `max`. */
+/** Picture URLs (http/https images, Roblox's tr.rbxcdn.com pictures, or pupboard's own /api/img and /api/demo-art links) found in the Gaming (Steam and Roblox) part of a summary, deduped, at most `max`. */
 export function steamImageUrls(summary, max = 80) {
   const urls = new Set();
   const walk = (v, depth) => {
     if (urls.size >= max || depth > 6 || v == null) return;
     if (typeof v === 'string') {
-      const web = /^https?:\/\/[^\s"'<>]+$/i.test(v) && /\.(?:jpe?g|png|webp|gif)(?:\?|$)/i.test(v);
+      const web = /^https?:\/\/[^\s"'<>]+$/i.test(v) && (/\.(?:jpe?g|png|webp|gif)(?:\?|$)/i.test(v) || /^https:\/\/[a-z0-9-]+\.rbxcdn\.com\//i.test(v));
       const ours = /^\/api\/(?:img|demo-art)\/[^\s"'<>]+$/.test(v); // pupboard's own picture links
       if (web || ours) urls.add(v);
     } else if (Array.isArray(v)) v.forEach((x) => walk(x, depth + 1));
     else if (typeof v === 'object') Object.values(v).forEach((x) => walk(x, depth + 1));
   };
   walk(summary?.steam?.data, 0);
+  walk(summary?.roblox?.data, 0);
   return [...urls];
 }
 

@@ -6,6 +6,9 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+### Added
+- Gaming: **Roblox**. Each Roblox experience you play shows up next to your Steam games, with how long you played it this week, in the list and the donut chart. If Roblox runs on the same computer as pupboard (Windows, macOS, or Sober on Linux), just add your profile link in Settings → Gaming (Roblox). To count play on your phone or console too, add a Roblox login cookie (see docs/Customise.md). Roblox keeps no play history, so counting starts when you set it up.
+
 ## [1.5.0] - 2026-11-18
 
 Thanks to Bird for testing "On this PC" on Windows.

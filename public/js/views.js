@@ -33,7 +33,14 @@ const ext = (href, text) => `<a href="${href}" target="_blank" rel="noopener nor
 // accent: which colour family the card uses (each card slot has one).
 // setup: fixed, trusted HTML shown when the source isn't set up yet.
 export const SOURCES = {
-  steam: { title: 'Gaming', route: '#/gaming', env: 'STEAM_API_KEY and STEAM_ID' },
+  steam: {
+    title: 'Gaming',
+    route: '#/gaming',
+    env: 'STEAM_API_KEY and STEAM_ID',
+    setup: `Connect Steam, Roblox or both on the ${SETTINGS_LINK} page (or set STEAM_API_KEY and STEAM_ID, or ROBLOX_USER, in your <code>.env</code> file and restart).`,
+  },
+  // Roblox shares the Gaming card (and its colours) with Steam.
+  roblox: { title: 'Gaming', provider: 'Roblox', route: '#/gaming', accent: 'steam', env: 'ROBLOX_USER or ROBLOX_COOKIE' },
   navidrome: { title: 'Music', provider: 'Navidrome', route: '#/music', env: 'NAVIDROME_URL, NAVIDROME_USER and NAVIDROME_PASSWORD' },
   listenbrainz: {
     title: 'Music',
@@ -136,27 +143,116 @@ export function steamPlayLink(appid, inner, mode = 'launch') {
   return `<a class="play-link" href="steam://rungameid/${e(id)}" title="Launch in Steam">${inner}</a>`;
 }
 
+/** roblox://experiences/start?placeId=<id> asks the Roblox app to join. Whole-number IDs only. */
+export function robloxPlayLink(placeId, inner) {
+  const id = Number(placeId);
+  if (!Number.isSafeInteger(id) || id <= 0) return inner;
+  return `<a class="play-link" href="roblox://experiences/start?placeId=${e(id)}" title="Play in Roblox">${inner}</a>`;
+}
+
+const robloxTag = '<span class="via via-tag">Roblox</span>';
+
+/** A game's (or Roblox experience's) name, linked to launch it. */
+function gameName(g, links) {
+  return g.kind === 'roblox' ? `${robloxPlayLink(g.placeId, e(g.name))} ${robloxTag}` : steamPlayLink(g.appid, e(g.name), links);
+}
+
 function gameRows(games, limit, maxMinutes, links) {
   return games
     .slice(0, limit)
     .map(
       (g) => `<li class="row" data-anim>
   ${img(g.icon || g.header, g.name, 'thumb thumb-game')}
-  <div class="row-main"><div class="row-title">${steamPlayLink(g.appid, e(g.name), links)}</div>${bar(g.minutes / maxMinutes, 'bar-steam')}</div>
-  <div class="row-value">${e(formatMinutes(g.minutes))}</div>
+  <div class="row-main"><div class="row-title">${gameName(g, links)}</div>${bar(g.minutes / maxMinutes, 'bar-steam')}</div>
+  <div class="row-value">${g.estimated ? '~' : ''}${e(formatMinutes(g.minutes))}</div>
 </li>`,
     )
     .join('');
 }
 
-export function steamGlance(env, now = Date.now()) {
+const hasData = (env) => Boolean(env?.data) && env.status !== 'unconfigured';
+
+/**
+ * Steam and Roblox together for the Gaming card: one list of games and
+ * experiences, sorted by time played this week. Pure.
+ *
+ * With only Steam this returns Steam's envelope unchanged. With both, Steam's
+ * numbers become 7-day numbers (exact once Steam has a week of history, else
+ * ~half its 2-week total, marked estimated) so they can sit next to Roblox's.
+ * A source that failed while the other works turns into a warning (Partial).
+ */
+export function mergeGaming(steamEnv, robloxEnv) {
+  const robloxOn = robloxEnv && robloxEnv.status !== 'unconfigured';
+  if (!robloxOn) return steamEnv;
+  const steamOn = Boolean(steamEnv) && steamEnv.status !== 'unconfigured';
+  const s = hasData(steamEnv) ? steamEnv.data : null;
+  const r = hasData(robloxEnv) ? robloxEnv.data : null;
+  // Neither has anything to show: let the one that's set up explain (Roblox if Steam isn't).
+  if (!s && !r) return steamOn && steamEnv.status !== 'error' ? steamEnv : { ...robloxEnv, source: 'roblox' };
+  const warnings = [...(s?.warnings ?? []), ...(r?.warnings ?? []).map((w) => `Roblox ${w}`)];
+  if (steamOn && !s && steamEnv.status !== 'loading') warnings.push(`Steam: ${steamEnv.error ?? 'unavailable'}`);
+  if (!r && robloxEnv.status !== 'loading') warnings.push(`Roblox: ${robloxEnv.error ?? 'unavailable'}`);
+
+  const steamGames = (s?.games ?? []).map((g) => {
+    const week = sevenDayMinutes(g, s.period);
+    return { ...g, kind: 'steam', minutes: week.minutes, estimated: week.estimated };
+  });
+  const robloxGames = (r?.games ?? []).map((g) => ({ ...g, kind: 'roblox' }));
+  const games = [...steamGames, ...robloxGames].filter((g) => g.minutes > 0).sort((a, b) => b.minutes - a.minutes);
+
+  const envs = [s && steamEnv, r && robloxEnv].filter(Boolean);
+  const ok = envs.filter((x) => x.status === 'ok');
+  const status = ok.length ? 'ok' : envs[0]?.status ?? 'loading';
+  const times = (ok.length ? ok : envs).map((x) => x.updatedAt).filter(Boolean).sort();
+  const robloxSince = r && r.period?.kind !== 'week' ? r.period.since : null;
+  return {
+    source: 'gaming',
+    status,
+    updatedAt: times[0] ?? null,
+    error: null,
+    data: {
+      player: s?.player ?? null,
+      roblox: r ? { user: r.user ?? null, playing: r.playing ?? null, methods: r.methods ?? {}, since: r.trackingSince ?? null, partial: Boolean(robloxSince) } : null,
+      period: { kind: 'week', label: 'Last 7 days', since: s?.period?.since ?? r?.period?.since ?? null, steamEstimated: steamGames.some((g) => g.estimated), robloxSince },
+      steamPeriod: s?.period ?? null,
+      totalMinutes: games.reduce((sum, g) => sum + g.minutes, 0),
+      gamesPlayed: games.length,
+      games,
+      minutes2Weeks: s?.minutes2Weeks ?? null,
+      ownedCount: s?.ownedCount ?? null,
+      trackingSince: s?.trackingSince ?? null,
+      hasSteam: Boolean(s),
+      links: s?.links ?? 'launch',
+      warnings,
+    },
+  };
+}
+
+/** "Playing …" from Steam, else from Roblox. */
+function playingNow(d) {
+  if (d.player?.inGame) return d.player.inGame;
+  const p = d.roblox?.playing;
+  return p ? `${p.name} on Roblox` : null;
+}
+
+/** Small print under the hours stat: what's estimated or only partly tracked. */
+function periodSub(d, now) {
+  const notes = [];
+  if (d.period?.steamEstimated) notes.push('Steam estimated');
+  if (d.period?.robloxSince) notes.push(`Roblox since ${timeAgo(d.period.robloxSince, now)}`);
+  return notes.length ? `hours played · ${notes.join(' · ')}` : 'hours played';
+}
+
+export function steamGlance(env, now = Date.now(), robloxEnv = null) {
+  env = mergeGaming(env, robloxEnv);
   const d = env?.data;
-  if (!d) return cardShell('steam', env, emptyState('steam', env), now);
+  if (!d) return cardShell('steam', env, emptyState(env?.source === 'roblox' ? 'roblox' : 'steam', env), now);
   const max = d.games[0]?.minutes || 1;
-  const playing = d.player?.inGame ? `<div class="now-pill" data-anim><span class="dot"></span>Playing ${e(d.player.inGame)}</div>` : '';
+  const now_ = playingNow(d);
+  const playing = now_ ? `<div class="now-pill" data-anim><span class="dot"></span>Playing ${e(now_)}</div>` : '';
   const body = `${playing}
 <div class="stats">
-  ${stat(d.period.label, count(toHours(d.totalMinutes), `${toHours(d.totalMinutes)}h`, { decimals: 1, suffix: 'h' }), 'hours played')}
+  ${stat(d.period.label, count(toHours(d.totalMinutes), `${toHours(d.totalMinutes)}h`, { decimals: 1, suffix: 'h' }), periodSub(d, now))}
   ${stat('Games played', count(d.gamesPlayed, String(d.gamesPlayed)))}
 </div>
 ${d.games.length ? `<ul class="rows">${gameRows(d.games, 4, max, d.links)}</ul>` : '<p class="muted" data-anim>No games played in this period.</p>'}`;
@@ -222,53 +318,87 @@ function donutChart(games) {
 </figure>`;
 }
 
-export function steamDetail(env, now = Date.now()) {
+/** What the Gaming page says about where its numbers come from. */
+function trackingNotes(d, now) {
+  const notes = [];
+  const sp = d.steamPeriod ?? (d.hasSteam === undefined ? d.period : null);
+  if (sp) {
+    notes.push(
+      sp.kind === 'week'
+        ? `Steam: counting playtime since ${new Date(sp.since).toLocaleDateString()}.`
+        : d.trackingSince
+          ? `Steam only reports 2-week totals. Daily tracking started ${timeAgo(d.trackingSince, now)}; the 7-day view switches on after a week of history.`
+          : "Steam only reports 2-week totals. Weekly tracking starts once your game library is readable (set Steam profile 'Game details' to public).",
+    );
+  }
+  const r = d.roblox;
+  if (r) {
+    const how = [];
+    if (r.methods?.presence) how.push('checks what you’re playing while pupboard is running (time while pupboard was off isn’t counted)');
+    if (r.methods?.logs) how.push('reads the Roblox app’s log files on this computer, which also cover time pupboard was off');
+    const start = r.partial && r.since ? ` Tracking started ${timeAgo(r.since, now)}, so this isn’t a full week yet.` : '';
+    notes.push(`Roblox has no play history, so pupboard ${how.join(' and ') || 'keeps its own'}.${start}`);
+  }
+  return notes.join(' ');
+}
+
+function profileBlock(name, avatar, line) {
+  return `<div class="profile" data-anim>${img(avatar, name, 'avatar')}<div><div class="profile-name">${e(name)}</div><div class="muted">${e(line)}</div></div></div>`;
+}
+
+function gameStats(g, d) {
+  if (g.kind === 'roblox') {
+    const label = d.period?.robloxSince ? 'So far' : 'Last 7 days';
+    return `<div><dt>${e(label)}</dt><dd>${e(formatMinutes(g.minutes))}</dd></div>
+      <div><dt>Sessions</dt><dd>${e(g.sessions ?? '—')}</dd></div>
+      <div><dt>Platform</dt><dd>Roblox</dd></div>`;
+  }
+  const week = g.kind === 'steam' ? { minutes: g.minutes, estimated: g.estimated } : sevenDayMinutes(g, d.period);
+  const seven = week.estimated
+    ? `<div title="Estimate: half of Steam's 2-week total, until a week of play history has been recorded"><dt>Last 7 days</dt><dd>~${e(formatMinutes(week.minutes))}</dd></div>`
+    : `<div><dt>Last 7 days</dt><dd>${e(formatMinutes(week.minutes))}</dd></div>`;
+  return `${seven}
+      <div><dt>Last 2 weeks</dt><dd>${e(formatMinutes(g.minutes2Weeks))}</dd></div>
+      <div><dt>All time</dt><dd>${e(formatMinutes(g.minutesForever))}</dd></div>`;
+}
+
+export function steamDetail(env, now = Date.now(), robloxEnv = null) {
+  env = mergeGaming(env, robloxEnv);
   const d = env?.data;
   const head = pageHead('steam', 'Gaming', env, now);
-  if (!d) return head + emptyState('steam', env);
+  if (!d) return head + emptyState(env?.source === 'roblox' ? 'roblox' : 'steam', env);
   const max = d.games[0]?.minutes || 1;
-  const player = d.player
-    ? `<div class="profile" data-anim>${img(d.player.avatar, d.player.name, 'avatar')}<div><div class="profile-name">${e(d.player.name)}</div><div class="muted">${e(d.player.inGame ? `Playing ${d.player.inGame}` : d.player.status)}</div></div></div>`
-    : '';
-  const tracking =
-    d.period.kind === 'week'
-      ? `Counting playtime since ${new Date(d.period.since).toLocaleDateString()}.`
-      : d.trackingSince
-        ? `Steam only reports 2-week totals. Daily tracking started ${timeAgo(d.trackingSince, now)}; the 7-day view switches on after a week of history.`
-        : "Steam only reports 2-week totals. Weekly tracking starts once your game library is readable (set Steam profile 'Game details' to public).";
+  const profiles = [];
+  if (d.player) profiles.push(profileBlock(d.player.name, d.player.avatar, d.player.inGame ? `Playing ${d.player.inGame}` : d.player.status));
+  const ru = d.roblox?.user;
+  if (ru) profiles.push(profileBlock(ru.displayName || ru.name, ru.avatar, d.roblox.playing ? `Playing ${d.roblox.playing.name} on Roblox` : 'Roblox'));
   const games = d.games
     .map(
       (g) => `<article class="game" data-anim>
   ${img(g.header, g.name, 'game-art')}
   <div class="game-body">
-    <h3>${steamPlayLink(g.appid, e(g.name), d.links)}</h3>
+    <h3>${gameName(g, d.links)}</h3>
     ${bar(g.minutes / max, 'bar-steam')}
     <dl class="game-stats">
-      ${(() => {
-        const week = sevenDayMinutes(g, d.period);
-        return week.estimated
-          ? `<div title="Estimate: half of Steam's 2-week total, until a week of play history has been recorded"><dt>Last 7 days</dt><dd>~${e(formatMinutes(week.minutes))}</dd></div>`
-          : `<div><dt>Last 7 days</dt><dd>${e(formatMinutes(week.minutes))}</dd></div>`;
-      })()}
-      <div><dt>Last 2 weeks</dt><dd>${e(formatMinutes(g.minutes2Weeks))}</dd></div>
-      <div><dt>All time</dt><dd>${e(formatMinutes(g.minutesForever))}</dd></div>
+      ${gameStats(g, d)}
     </dl>
   </div>
 </article>`,
     )
     .join('');
+  const steamWeek = d.steamPeriod ? d.steamPeriod.kind === 'week' : d.period.kind === 'week';
   return `${head}
 <section class="gaming-hero">
-  ${player || '<div></div>'}
+  ${profiles.length ? `<div class="profiles">${profiles.join('')}</div>` : '<div></div>'}
   ${donutChart(d.games)}
 </section>
 <section class="stats stats-wide">
-  ${stat(d.period.label, count(toHours(d.totalMinutes), `${toHours(d.totalMinutes)}h`, { decimals: 1, suffix: 'h' }), 'hours played')}
+  ${stat(d.period.label, count(toHours(d.totalMinutes), `${toHours(d.totalMinutes)}h`, { decimals: 1, suffix: 'h' }), periodSub(d, now))}
   ${stat('Games played', count(d.gamesPlayed, String(d.gamesPlayed)))}
-  ${d.period.kind === 'week' ? stat('Last 2 weeks', count(toHours(d.minutes2Weeks), `${toHours(d.minutes2Weeks)}h`, { decimals: 1, suffix: 'h' }), 'per Steam') : ''}
-  ${d.ownedCount != null ? stat('Games owned', count(d.ownedCount, String(d.ownedCount))) : ''}
+  ${steamWeek && d.minutes2Weeks != null && d.hasSteam !== false ? stat('Last 2 weeks', count(toHours(d.minutes2Weeks), `${toHours(d.minutes2Weeks)}h`, { decimals: 1, suffix: 'h' }), 'per Steam') : ''}
+  ${d.ownedCount != null ? stat('Games owned', count(d.ownedCount, String(d.ownedCount)), d.roblox ? 'on Steam' : '') : ''}
 </section>
-<p class="note" data-anim>${e(tracking)}</p>
+<p class="note" data-anim>${e(trackingNotes(d, now))}</p>
 ${games ? `<section class="games">${games}</section>` : '<p class="muted" data-anim>No games played in this period.</p>'}
 ${warningsNote(d)}`;
 }
@@ -720,7 +850,7 @@ export function slotsOf(summary) {
 export function overview(summary, now = Date.now()) {
   const slots = slotsOf(summary);
   return `<section class="grid">
-${steamGlance(summary?.steam, now)}
+${steamGlance(summary?.steam, now, summary?.roblox)}
 ${GLANCE[slots.music](summary?.[slots.music], now, summary?.local)}
 ${GLANCE[slots.media](summary?.[slots.media], now)}
 ${rssGlance(summary?.rss, now)}
@@ -730,7 +860,7 @@ ${rssGlance(summary?.rss, now)}
 /** Route name -> { source key or null, render(summary, now) } */
 export const ROUTES = {
   '': { key: null, render: (s, now) => overview(s, now) },
-  gaming: { key: 'steam', render: (s, now) => steamDetail(s?.steam, now) },
+  gaming: { key: 'steam', render: (s, now) => steamDetail(s?.steam, now, s?.roblox) },
   music: { key: 'navidrome', render: (s, now) => DETAIL[slotsOf(s).music](s?.[slotsOf(s).music], now, s?.local) },
   media: { key: 'jellyfin', render: (s, now) => DETAIL[slotsOf(s).media](s?.[slotsOf(s).media], now) },
   news: { key: 'rss', render: (s, now) => rssDetail(s?.rss, now) },

@@ -1,4 +1,4 @@
-// A fake fetch() that pretends to be Steam, Navidrome, Jellyfin, Spotify,
+// A fake fetch() that pretends to be Steam, Roblox, Navidrome, Jellyfin, Spotify,
 // ListenBrainz, Letterboxd, the deal sites and RSS feeds.
 // It fails some requests on purpose (errors, timeouts, bad JSON) so the
 // dashboard's error handling gets exercised. Used by `npm run demo` and tests.
@@ -31,6 +31,35 @@ const OWNED_EXTRA = [
   { appid: 9900006, name: 'Frostline Outpost', forever: 4100 },
   { appid: 9900007, name: 'Puzzle Orbit', forever: 900 },
 ];
+
+// Invented Roblox experiences (made-up ids, not real experiences).
+const ROBLOX_EXPERIENCES = [
+  { universe: 9000001, place: 9100001, name: 'Pupperton Obby', weight: 5 },
+  { universe: 9000002, place: 9100002, name: 'Sky Bakery Tycoon', weight: 3 },
+  { universe: 9000003, place: 9100003, name: 'Moonlit Kart Club', weight: 2 },
+  { universe: 9000004, place: 9100004, name: 'Lighthouse Hide & Seek', weight: 1 },
+];
+const ROBLOX_USER = 1000001;
+
+/**
+ * Demo mode starts with eight days of invented Roblox sessions, so the
+ * Gaming card shows a full week straight away.
+ */
+export function demoRobloxHistory(now) {
+  const rand = seededRandom(7);
+  const sessions = [];
+  for (let d = 8; d >= 0; d--) {
+    const count = 1 + Math.floor(rand() * 2);
+    for (let i = 0; i < count; i++) {
+      const pick = rand() * 11;
+      const exp = ROBLOX_EXPERIENCES.find((x, j) => pick < ROBLOX_EXPERIENCES.slice(0, j + 1).reduce((sum, y) => sum + y.weight, 0)) ?? ROBLOX_EXPERIENCES[0];
+      const start = now - d * DAY - (3 + i * 4 + rand() * 2) * 3_600_000;
+      if (start >= now) continue;
+      sessions.push({ p: exp.place, u: exp.universe, s: start, e: Math.min(now, start + (15 + rand() * 80) * MIN), src: 'presence' });
+    }
+  }
+  return { account: String(ROBLOX_USER), since: now - 8 * DAY, sessions, universes: {} };
+}
 
 const ARTISTS = [
   ['Glass Harbor', 'Night Ferry', 'Electronic'],
@@ -166,6 +195,32 @@ function route(url, now) {
       return json({ response: { game_count: games.length, games } });
     }
     if (p.includes('GetPlayerSummaries')) return json({ response: { players: [{ personaname: 'Demo Player', personastate: 1, avatarfull: null, profileurl: null }] } });
+  }
+  if (u.host === 'presence.roblox.com') {
+    // Some minutes in an experience, some not, so the "Playing" line comes and goes.
+    const exp = ROBLOX_EXPERIENCES[Math.floor(now / (20 * MIN)) % ROBLOX_EXPERIENCES.length];
+    const playing = Math.floor(now / (10 * MIN)) % 3 !== 0;
+    return json({ userPresences: [{ userPresenceType: playing ? 2 : 1, lastLocation: playing ? exp.name : 'Website', placeId: playing ? exp.place : null, rootPlaceId: playing ? exp.place : null, universeId: playing ? exp.universe : null, userId: ROBLOX_USER }] });
+  }
+  if (u.host === 'users.roblox.com') {
+    if (p === '/v1/users/authenticated') return json({ id: ROBLOX_USER, name: 'demo_builder', displayName: 'Demo Builder' });
+    if (p === '/v1/usernames/users') return json({ data: [{ id: ROBLOX_USER, name: 'demo_builder', displayName: 'Demo Builder' }] });
+    if (p.startsWith('/v1/users/')) return json({ id: ROBLOX_USER, name: 'demo_builder', displayName: 'Demo Builder' });
+  }
+  if (u.host === 'games.roblox.com' && p === '/v1/games') {
+    const ids = (u.searchParams.get('universeIds') ?? '').split(',').map(Number);
+    return json({ data: ROBLOX_EXPERIENCES.filter((x) => ids.includes(x.universe)).map((x) => ({ id: x.universe, rootPlaceId: x.place, name: x.name })) });
+  }
+  if (u.host === 'thumbnails.roblox.com') {
+    if (p === '/v1/users/avatar-headshot') return json({ data: [{ targetId: ROBLOX_USER, state: 'Completed', imageUrl: art('roblox-avatar', 150, 150) }] });
+    const ids = (u.searchParams.get('universeIds') ?? '').split(',').map(Number).filter(Boolean);
+    if (p === '/v1/games/icons') return json({ data: ids.map((id) => ({ targetId: id, state: 'Completed', imageUrl: art(`roblox-${id}`, 150, 150) })) });
+    if (p === '/v1/games/multiget/thumbnails') return json({ data: ids.map((id) => ({ universeId: id, thumbnails: [{ state: 'Completed', imageUrl: art(`roblox-wide-${id}`, 768, 432) }] })) });
+  }
+  if (u.host === 'apis.roblox.com') {
+    const place = Number(p.match(/places\/(\d+)\/universe/)?.[1]);
+    const exp = ROBLOX_EXPERIENCES.find((x) => x.place === place);
+    if (exp) return json({ universeId: exp.universe });
   }
   if (u.host === 'navidrome.demo') {
     const all = songs(now);

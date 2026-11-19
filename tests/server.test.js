@@ -95,12 +95,12 @@ test('nothing configured: zero-setup sources still fill the page', async () => {
     const summary = await loadPageLikeABrowser(app.base);
     // Music falls back to ListenBrainz's "how to connect" card; Media to game deals (no setup needed).
     assert.deepEqual(summary.slots, { music: 'listenbrainz', media: 'deals' });
-    for (const key of ['steam', 'listenbrainz']) assert.equal(summary[key].status, 'unconfigured');
+    for (const key of ['steam', 'roblox', 'listenbrainz']) assert.equal(summary[key].status, 'unconfigured');
     assert.notEqual(summary.deals.status, 'unconfigured', 'deals need no setup');
     assert.notEqual(summary.rss.status, 'unconfigured', 'RSS has default feeds');
     assert.ok(!('jellyfin' in summary) && !('navidrome' in summary), 'sources not on screen are not fetched');
     const health = await (await fetch(`${app.base}/api/health`)).json();
-    assert.deepEqual(health.sources, { steam: false, navidrome: false, jellyfin: false, rss: true, listenbrainz: false, spotify: false, letterboxd: false, deals: true });
+    assert.deepEqual(health.sources, { steam: false, roblox: false, navidrome: false, jellyfin: false, rss: true, listenbrainz: false, spotify: false, letterboxd: false, deals: true });
   } finally {
     await app.stop();
     await cleanup();

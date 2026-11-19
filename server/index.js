@@ -19,7 +19,7 @@ const inContainer = existsSync('/.dockerenv') || existsSync('/run/.containerenv'
 if (inContainer) config.setupEnabled = false;
 // A fresh code every start: the setup page only works with it.
 const setup = { code: randomBytes(16).toString('hex'), env, file: settingsFile };
-const { server, warm } = createApp({ config, fetchImpl, setup, inContainer });
+const { server, warm, pollRoblox } = createApp({ config, fetchImpl, setup, inContainer });
 
 process.on('unhandledRejection', (err) => console.error('[process] unhandled rejection', err));
 
@@ -69,6 +69,10 @@ server.listen(config.port, config.host, () => {
   if (wantsBrowser) openBrowser(accounts.length === 0 && setupOn ? setupUrl : local);
   warm().catch(() => {});
   setInterval(() => warm().catch(() => {}), config.refreshMinutes * 60_000).unref();
+  // Roblox has no play history, so pupboard checks what you're playing on a timer.
+  // The interval is read each time, so a change on the settings page applies straight away.
+  const robloxTick = () => setTimeout(() => pollRoblox().finally(robloxTick), config.roblox.pollSeconds * 1000).unref();
+  robloxTick();
 });
 
 const shutdown = () => server.close(() => process.exit(0));

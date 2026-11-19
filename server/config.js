@@ -1,4 +1,5 @@
 import { createFeedList } from './sources/rss.js';
+import { robloxPollSeconds } from './sources/roblox.js';
 
 // Reads all settings from environment variables (see .env.example).
 // Nothing here throws: a missing value just leaves that source "unconfigured".
@@ -54,6 +55,16 @@ export function loadConfig(env = process.env) {
       hide: str(env.STEAM_HIDE), // empty = the built-in list (DEFAULT_STEAM_HIDE)
       ttlMs: positive(env.STEAM_CACHE_SECONDS, 300) * 1000,
     },
+    // Roblox: which experiences you play (see server/sources/roblox.js).
+    roblox: {
+      user: str(env.ROBLOX_USER),
+      cookie: str(env.ROBLOX_COOKIE),
+      // Read the Roblox app's log files on this computer ("auto") or not ("off").
+      logs: /^(0|off|false|no)$/i.test(str(env.ROBLOX_LOGS)) ? 'off' : 'auto',
+      logDir: str(env.ROBLOX_LOG_DIR),
+      pollSeconds: robloxPollSeconds(env.ROBLOX_POLL_SECONDS),
+      ttlMs: positive(env.ROBLOX_CACHE_SECONDS, 60) * 1000,
+    },
     navidrome: {
       url: baseUrl(env.NAVIDROME_URL),
       user: str(env.NAVIDROME_USER),
@@ -99,6 +110,7 @@ export function loadConfig(env = process.env) {
   if (config.demo) {
     // Demo mode routes every request to fake, deliberately flaky servers.
     config.steam = { ...config.steam, apiKey: 'demo', steamId: '76561190000000000' };
+    config.roblox = { ...config.roblox, user: '1000001', cookie: `_|DEMO|_${'0'.repeat(60)}`, logs: 'off', logDir: '' };
     config.navidrome = { ...config.navidrome, url: 'http://navidrome.demo', user: 'demo', password: 'demo' };
     config.jellyfin = { ...config.jellyfin, url: 'http://jellyfin.demo', apiKey: 'demo' };
     config.listenbrainz = { ...config.listenbrainz, user: 'demo' };
@@ -122,6 +134,8 @@ export function loadConfig(env = process.env) {
 
 export const isConfigured = {
   steam: (c) => Boolean(c.steam.apiKey && c.steam.steamId),
+  // A profile or a cookie turns Roblox on (log files are then read automatically too).
+  roblox: (c) => Boolean(c.roblox?.user || c.roblox?.cookie),
   navidrome: (c) => Boolean(c.navidrome.url && c.navidrome.user && c.navidrome.password),
   jellyfin: (c) => Boolean(c.jellyfin.url && c.jellyfin.apiKey),
   rss: (c) => c.rss.list().feeds.length > 0,

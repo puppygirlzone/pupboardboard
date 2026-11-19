@@ -11,6 +11,7 @@ For anything that isn't sensitive (bugs, ideas, questions), regular issues are w
 ## What pupboard protects, and what it doesn't
 
 - **Your keys and passwords** never leave the server: the browser never sees them, they aren't put in URLs or logs, and the Settings page can only tell whether one is set, not read it back. They're stored in `.env` or `data/settings.json` (readable only by your user account).
+- **A Roblox login cookie**, if you add one, is treated the same way and is only ever sent to roblox.com. It can sign in as that Roblox account, so the docs suggest a spare account made just for pupboard.
 - **The Settings page** only works in a browser on the computer running pupboard, and only with the code printed when pupboard starts. It's off inside Docker.
 - **The dashboard itself has no login.** Anyone who can reach its port can see your gaming, music, media and news stats. Keep it on your home network, or put it behind a reverse proxy that asks for a password if you need it from outside. The download version only listens on your own computer unless you change that in Settings.
 - **News feeds** are fetched by the server, so only add feeds you trust the address of. Text from feeds is escaped and only `http(s)` links are shown.
