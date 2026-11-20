@@ -131,13 +131,78 @@ test('log parser stays fast on hostile input', () => {
   }
 });
 
-test('log folders: Windows (incl. Microsoft Store), macOS and Sober on Linux', () => {
-  const win = robloxLogDirs({ platform: 'win32', env: { LOCALAPPDATA: 'C:\\Users\\a\\AppData\\Local' }, home: 'C:\\Users\\a' });
-  assert.equal(win[0], 'C:\\Users\\a\\AppData\\Local\\Roblox\\logs');
-  assert.equal(win[1].storeParent, 'C:\\Users\\a\\AppData\\Local\\Packages');
-  assert.deepEqual(robloxLogDirs({ platform: 'darwin', home: '/Users/a' }), ['/Users/a/Library/Logs/Roblox']);
-  assert.deepEqual(robloxLogDirs({ platform: 'linux', home: '/home/a' }), ['/home/a/.var/app/org.vinegarhq.Sober/data/sober/sober_logs']);
+test('log folders: Windows (Roblox, Bloxstrap, Fishstrap, Microsoft Store), macOS, and Sober, Cordial and Quadra on Linux', () => {
+  const show = (list) => list.map((x) => [x.client, x.parts.map((p) => (typeof p === 'string' ? p : '*')).join('|')]);
+  assert.deepEqual(show(robloxLogDirs({ platform: 'win32', env: { LOCALAPPDATA: 'C:\\Users\\a\\AppData\\Local' }, home: 'C:\\Users\\a' })), [
+    ['Roblox, Bloxstrap or Fishstrap', 'C:\\Users\\a\\AppData\\Local|Roblox|logs'],
+    ['Roblox (Microsoft Store)', 'C:\\Users\\a\\AppData\\Local|Packages|*|LocalState|logs'],
+  ]);
+  assert.deepEqual(show(robloxLogDirs({ platform: 'darwin', home: '/Users/a' })), [['Roblox', '/Users/a|Library|Logs|Roblox']]);
+  const linux = show(robloxLogDirs({ platform: 'linux', env: {}, home: '/home/a' }));
+  assert.deepEqual(
+    linux.map((x) => x[0]),
+    ['Sober', 'Sober', 'Cordial', 'Cordial', 'Quadra', 'Quadra'],
+  );
+  assert.ok(linux.some((x) => x[1] === '/home/a/.var/app/io.github.luohoa97.Cordial/data|cordial|profiles|*|data|files|appData|logs'));
+  assert.ok(linux.some((x) => x[1] === '/home/a/.local/share|quadra|prefix|root|Users|*|Library|Logs|Roblox'));
+  // XDG_DATA_HOME moves the non-Flatpak installs.
+  assert.ok(show(robloxLogDirs({ platform: 'linux', env: { XDG_DATA_HOME: '/data' }, home: '/home/a' })).some((x) => x[1].startsWith('/data|cordial|')));
   assert.deepEqual(robloxLogDirs({ platform: 'freebsd', home: '/home/a' }), []);
+});
+
+test('log reader: every Linux client found is read, with any profile or user name, and Sober twice counts once', async () => {
+  const { dir, cleanup } = await tempDir();
+  try {
+    const now = Date.now();
+    const write = async (parts, name, place, start, minutes) => {
+      const folder = path.join(dir, ...parts);
+      await mkdir(folder, { recursive: true });
+      const file = path.join(folder, name);
+      await writeFile(file, [winLine(start, join(place)), winLine(start + minutes * MIN, 'Client:Disconnect')].join('\n'));
+      await utimes(file, new Date(start + minutes * MIN), new Date(start + minutes * MIN));
+    };
+    const t = now - 3 * 3_600_000;
+    // Sober writes the same session to two folders.
+    await write(['.var/app/org.vinegarhq.Sober/data/sober/sober_logs'], 'a.log', 1, t, 10);
+    await write(['.var/app/org.vinegarhq.Sober/data/sober/appData/logs'], '2.745_Player_a_last.log', 1, t, 10);
+    await write(['.var/app/io.github.luohoa97.Cordial/data/cordial/profiles/gaming/data/files/appData/logs'], '2.746_Player_b_last.log', 2, t + 30 * MIN, 5);
+    await write(['.local/share/quadra/prefix/root/Users/someone/Library/Logs/Roblox'], '0.747_Player_c_last.log', 3, t + 60 * MIN, 20);
+    await write(['.local/share/quadra/prefix/root/Users/someone/Library/Logs/Roblox'], '0.747_Player_c_CrashHandler_last.log', 3, t + 60 * MIN, 0);
+    const extra = path.join(dir, 'mounted');
+    await write(['mounted'], 'win_Player_last.log', 4, t + 90 * MIN, 15);
+
+    const reader = createRobloxLogReader({ customDir: extra, platform: 'linux', env: {}, home: dir });
+    const { dirs, sessions } = await reader.read();
+    assert.equal(dirs.length, 5, 'ROBLOX_LOG_DIR adds to the clients found, it does not replace them');
+    assert.deepEqual([...new Set(sessions.map((s) => s.placeId))].sort(), [1, 2, 3, 4]);
+
+    const history = createRobloxHistory({ dataDir: path.join(dir, 'data') });
+    await history.addLogSessions(sessions, now);
+    const week = computeRobloxWeek(await history.current(), now);
+    assert.deepEqual(
+      Object.entries(week.perExperience).map(([k, v]) => [k, v.minutes]),
+      [
+        ['place:1', 10],
+        ['place:2', 5],
+        ['place:3', 20],
+        ['place:4', 15],
+      ],
+    );
+  } finally {
+    await cleanup();
+  }
+});
+
+test('log reader: Windows clients (Bloxstrap shares Roblox\'s folder) and the Microsoft Store folder are matched', async () => {
+  const { dir, cleanup } = await tempDir();
+  try {
+    // On Linux the Windows paths can't be real, so check the pattern list matches folder names as Windows has them.
+    const store = robloxLogDirs({ platform: 'win32', env: { LOCALAPPDATA: dir }, home: dir })[1].parts[2];
+    assert.ok(store.test('ROBLOXCORPORATION.ROBLOX_55nm5eh3cm0pr'));
+    assert.ok(!store.test('Microsoft.WindowsTerminal_8wekyb3d8bbwe'));
+  } finally {
+    await cleanup();
+  }
 });
 
 test('log reader: reads a folder, skips Studio logs and links, spots a session still going', async () => {
@@ -153,7 +218,7 @@ test('log reader: reads a folder, skips Studio logs and links, spots a session s
     await symlink(live, path.join(dir, 'latest.log'));
     await writeFile(path.join(dir, 'notes.txt'), winLine(now, join(333)));
 
-    const reader = createRobloxLogReader({ customDir: dir });
+    const reader = createRobloxLogReader({ customDir: dir, platform: 'linux', env: {}, home: path.join(dir, 'nohome') });
     const { dirs, sessions } = await reader.read();
     assert.deepEqual(dirs, [dir]);
     assert.deepEqual(
@@ -164,7 +229,7 @@ test('log reader: reads a folder, skips Studio logs and links, spots a session s
       ],
     );
     assert.ok(sessions[1].end >= now - MIN);
-    assert.deepEqual((await createRobloxLogReader({ customDir: path.join(dir, 'missing') }).read()).dirs, []);
+    assert.deepEqual((await createRobloxLogReader({ customDir: path.join(dir, 'missing'), platform: 'linux', env: {}, home: path.join(dir, 'nohome') }).read()).dirs, []);
   } finally {
     await cleanup();
   }

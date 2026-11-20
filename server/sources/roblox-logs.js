@@ -6,11 +6,11 @@
 //
 // and when you leave, lines such as "Client:Disconnect". Log folders:
 //
-//   Windows:   %LOCALAPPDATA%\Roblox\logs (also used by Bloxstrap / Fishstrap)
-//              %LOCALAPPDATA%\Packages\ROBLOXCORPORATION.ROBLOX_*\LocalState\logs (Microsoft Store)
-//   macOS:     ~/Library/Logs/Roblox
-//   Linux:     ~/.var/app/org.vinegarhq.Sober/data/sober/sober_logs (Sober)
-//   anywhere:  ROBLOX_LOG_DIR (for example a folder mounted into Docker)
+//   Windows:   Roblox, Bloxstrap, Fishstrap, Microsoft Store
+//   macOS:     Roblox
+//   Linux:     Sober, Cordial, Quadra
+//   anywhere:  ROBLOX_LOG_DIR (an extra folder, for example mounted into Docker)
+// (exact folders in robloxLogDirs below). Every client's folder is read.
 //
 // Files are only read (never run), scanned line by line with indexOf, and
 // capped in number and size. Roblox Studio logs are skipped.
@@ -78,14 +78,40 @@ export function parseRobloxLog(text) {
   return sessions;
 }
 
-/** Folders the Roblox app writes its logs to on this system (existing or not). */
+const ANY = /^[^.][^/\\]{0,200}$/; // one folder of any name (a profile, a user), not hidden
+
+/**
+ * Where Roblox clients write the Roblox app's logs, as folder paths split
+ * into parts. A RegExp part matches any folder with that name pattern, for
+ * clients that keep logs per profile or per user. All of them are checked;
+ * finding one client never stops another from being read.
+ *   Windows: Roblox itself, Bloxstrap and Fishstrap (same folder), Microsoft Store
+ *   Linux:   Sober, Cordial and Quadra (Flatpak or not)
+ *   macOS:   Roblox itself
+ */
 export function robloxLogDirs({ platform = process.platform, env = process.env, home = os.homedir() } = {}) {
   if (platform === 'win32') {
-    const local = env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
-    return [path.win32.join(local, 'Roblox', 'logs'), { storeParent: path.win32.join(local, 'Packages') }];
+    const local = env.LOCALAPPDATA || path.win32.join(home, 'AppData', 'Local');
+    return [
+      { client: 'Roblox, Bloxstrap or Fishstrap', parts: [local, 'Roblox', 'logs'] },
+      { client: 'Roblox (Microsoft Store)', parts: [local, 'Packages', /^ROBLOXCORPORATION\.ROBLOX_/i, 'LocalState', 'logs'] },
+    ];
   }
-  if (platform === 'darwin') return [path.join(home, 'Library', 'Logs', 'Roblox')];
-  if (platform === 'linux') return [path.join(home, '.var', 'app', 'org.vinegarhq.Sober', 'data', 'sober', 'sober_logs')];
+  if (platform === 'darwin') return [{ client: 'Roblox', parts: [home, 'Library', 'Logs', 'Roblox'] }];
+  if (platform === 'linux') {
+    const share = env.XDG_DATA_HOME || path.posix.join(home, '.local', 'share');
+    const flatpak = (id) => path.posix.join(home, '.var', 'app', id, 'data');
+    return [
+      { client: 'Sober', parts: [flatpak('org.vinegarhq.Sober'), 'sober', 'sober_logs'] },
+      { client: 'Sober', parts: [flatpak('org.vinegarhq.Sober'), 'sober', 'appData', 'logs'] },
+      // Cordial runs the Android client; each Cordial profile has its own logs.
+      { client: 'Cordial', parts: [flatpak('io.github.luohoa97.Cordial'), 'cordial', 'profiles', ANY, 'data', 'files', 'appData', 'logs'] },
+      { client: 'Cordial', parts: [share, 'cordial', 'profiles', ANY, 'data', 'files', 'appData', 'logs'] },
+      // Quadra runs the macOS client in its own prefix, so logs sit in a Mac-style home folder.
+      { client: 'Quadra', parts: [share, 'quadra', 'prefix', 'root', 'Users', ANY, 'Library', 'Logs', 'Roblox'] },
+      { client: 'Quadra', parts: [flatpak('org.quadrahq.Quadra'), 'quadra', 'prefix', 'root', 'Users', ANY, 'Library', 'Logs', 'Roblox'] },
+    ];
+  }
   return [];
 }
 
@@ -97,25 +123,43 @@ async function isDir(p) {
   }
 }
 
-/** The log folders that exist right now (custom folder first, if given). */
-export async function findRobloxLogDirs({ customDir = '', platform, env, home } = {}) {
-  if (customDir) return (await isDir(customDir)) ? [customDir] : [];
-  const found = [];
-  for (const entry of robloxLogDirs({ platform, env, home })) {
-    if (typeof entry === 'string') {
-      if (await isDir(entry)) found.push(entry);
-    } else if (entry.storeParent) {
-      // Microsoft Store install: Packages\ROBLOXCORPORATION.ROBLOX_<id>\LocalState\logs
+const MAX_MATCHES = 10; // folders per wildcard (profiles, users)
+
+/** Every existing folder a parts list points at (RegExp parts matched against folder names). */
+async function expand(parts, join) {
+  let current = [parts[0]];
+  for (const part of parts.slice(1)) {
+    const next = [];
+    for (const base of current) {
+      if (typeof part === 'string') {
+        next.push(join(base, part));
+        continue;
+      }
       try {
-        for (const name of await readdir(entry.storeParent)) {
-          if (!/^ROBLOXCORPORATION\.ROBLOX_/i.test(name)) continue;
-          const dir = path.win32.join(entry.storeParent, name, 'LocalState', 'logs');
-          if (await isDir(dir)) found.push(dir);
-        }
+        const names = (await readdir(base)).filter((n) => part.test(n)).sort().slice(0, MAX_MATCHES);
+        for (const n of names) next.push(join(base, n));
       } catch {
-        /* no Packages folder */
+        /* folder missing: nothing here */
       }
     }
+    current = next;
+    if (!current.length) return [];
+  }
+  const found = [];
+  for (const dir of current) if (await isDir(dir)) found.push(dir);
+  return found;
+}
+
+/**
+ * The log folders that exist right now, for every client found, plus
+ * ROBLOX_LOG_DIR if set (an extra folder, e.g. mounted into Docker).
+ */
+export async function findRobloxLogDirs({ customDir = '', platform = process.platform, env, home } = {}) {
+  const join = platform === 'win32' ? path.win32.join : path.join;
+  const found = [];
+  if (customDir && (await isDir(customDir))) found.push(customDir);
+  for (const entry of robloxLogDirs({ platform, env, home })) {
+    for (const dir of await expand(entry.parts, join)) if (!found.includes(dir)) found.push(dir);
   }
   return found;
 }
