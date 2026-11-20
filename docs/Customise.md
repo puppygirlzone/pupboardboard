@@ -65,11 +65,11 @@ Roblox doesn't keep a play history anyone can read, so pupboard counts it itself
 
 **1. Roblox on this computer (no login).** If you play Roblox on the computer that runs pupboard, put your profile link in Settings → Gaming (Roblox) and you're done. The Roblox app writes down every time you join or leave an experience, and pupboard reads those notes. This even catches play from before you set it up (as far back as Roblox keeps them) and time when pupboard wasn't running. It looks in:
 
-- **Windows:** `%LOCALAPPDATA%\Roblox\logs` (also used by Bloxstrap and Fishstrap) and the Microsoft Store version's folder
+- **Windows:** the normal Roblox app, Bloxstrap and Fishstrap (they all use `%LOCALAPPDATA%\Roblox\logs`), and the Microsoft Store version
 - **macOS:** `~/Library/Logs/Roblox`
-- **Linux:** Sober's `~/.var/app/org.vinegarhq.Sober/data/sober/sober_logs`
+- **Linux:** [Sober](https://sober.vinegarhq.org), [Cordial](https://github.com/luohoa97/cordial) (every profile) and [Quadra](https://github.com/QuadraHQ/Quadra), installed from Flathub or not
 
-Set `ROBLOX_LOG_DIR` to use another folder, or `ROBLOX_LOGS=off` to not read them. Inside Docker it only reads a folder you mount and point `ROBLOX_LOG_DIR` at.
+It reads every one it finds, so switching clients doesn't lose anything. Set `ROBLOX_LOG_DIR` to add another folder, or `ROBLOX_LOGS=off` to not read them. Inside Docker it only reads a folder you mount and point `ROBLOX_LOG_DIR` at.
 
 **2. Any device (needs a login cookie).** To count play on your phone, console or another PC, pupboard asks Roblox what you're in every minute (`ROBLOX_POLL_SECONDS`). Roblox only answers that for a logged-in account, so pupboard needs that account's `.ROBLOSECURITY` cookie.
 

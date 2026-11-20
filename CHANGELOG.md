@@ -6,6 +6,9 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+### Fixed
+- Gaming: Roblox play is now counted when you play through **Cordial** or **Quadra** on Linux, not just Sober. Bloxstrap and Fishstrap on Windows keep working. pupboard reads every client it finds, so switching clients doesn't lose any time.
+
 ## [1.6.0] - 2026-11-20
 
 ### Added
