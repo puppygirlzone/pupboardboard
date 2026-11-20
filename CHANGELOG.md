@@ -6,6 +6,8 @@ Downloads: [Releases](https://github.com/puppygirlzone/pupboardboard/releases). 
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-20
+
 ### Fixed
 - Gaming: Roblox play is now counted when you play through **Cordial** or **Quadra** on Linux, not just Sober. Bloxstrap and Fishstrap on Windows keep working. pupboard reads every client it finds, so switching clients doesn't lose any time.
 
@@ -108,7 +110,8 @@ First public release.
 - **Docker image** on ghcr.io (amd64 and arm64), with Compose and Dockge support.
 - Copes with unreliable services: timeouts, retries, cached data marked **Offline** or **Partial**, and "—" instead of a misleading 0.
 
-[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/puppygirlzone/pupboardboard/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/puppygirlzone/pupboardboard/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/puppygirlzone/pupboardboard/compare/v1.4.1...v1.4.2
